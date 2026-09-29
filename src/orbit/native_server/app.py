@@ -51,7 +51,14 @@ from orbit.native_llama.model_discovery import (
 from orbit.terminal.theme import supports_ansi
 from orbit.native_llama.model_download import download_model, huggingface_resolve_url, parse_huggingface_spec
 from orbit.native_llama.model_store import download_advisory
-from orbit.native_llama.model_profiles import ORNITH15_PROFILE_ID, QWEN3_CODER_PROFILE_ID, QWEN38_FLASH_NEXT_PROFILE_ID
+from orbit.native_llama.model_profiles import (
+    GRANITE42_8B_PROFILE_ID,
+    GRANITE42_PROFILE_ID,
+    MINICPM5_PROFILE_ID,
+    ORNITH15_PROFILE_ID,
+    QWEN3_CODER_PROFILE_ID,
+    QWEN38_FLASH_NEXT_PROFILE_ID,
+)
 from orbit.native_llama.model_registry import default_hf_cache, effective_models_dir, get_manifest, local_model_path
 from orbit.native_llama.paths import (
     DEFAULT_LLAMA_ROOT,
@@ -72,6 +79,7 @@ from orbit.native_llama.ornith_analysis_prefix import (
     resolve_ornith_analysis_prefix_reuse,
 )
 from orbit.native_llama.ornith_route_prefix import resolve_ornith_route_prefix_reuse
+from orbit.native_llama.minicpm5_route_prefix import resolve_minicpm5_route_prefix_reuse
 from orbit.native_llama.qwen3_coder_route_prefix import resolve_qwen3_coder_route_prefix_reuse
 from orbit.native_server.protocol import (
     ContinueRequest,
@@ -1308,6 +1316,7 @@ def run_server(argv: list[str] | None = None) -> int:
     qwen36_shell_tool_prefix_config = resolve_qwen36_shell_tool_prefix_reuse()
     qwen3_coder_route_prefix_config = resolve_qwen3_coder_route_prefix_reuse()
     ornith_route_prefix_config = resolve_ornith_route_prefix_reuse()
+    minicpm5_route_prefix_config = resolve_minicpm5_route_prefix_reuse()
     ornith_analysis_prefix_config = resolve_ornith_analysis_prefix_reuse()
 
     # Resolved BEFORE the model loads, because batch and ubatch are context
@@ -1383,6 +1392,9 @@ def run_server(argv: list[str] | None = None) -> int:
                 ornith_route_prefix_reuse_enabled=ornith_route_prefix_config.enabled,
                 ornith_route_prefix_reuse_source=ornith_route_prefix_config.source,
                 ornith_route_prefix_reuse_config_error=ornith_route_prefix_config.validation_error,
+                minicpm5_route_prefix_reuse_enabled=minicpm5_route_prefix_config.enabled,
+                minicpm5_route_prefix_reuse_source=minicpm5_route_prefix_config.source,
+                minicpm5_route_prefix_reuse_config_error=minicpm5_route_prefix_config.validation_error,
                 ornith_analysis_prefix_reuse_enabled=ornith_analysis_prefix_config.enabled,
                 ornith_analysis_prefix_reuse_source=ornith_analysis_prefix_config.source,
                 ornith_analysis_prefix_reuse_config_error=ornith_analysis_prefix_config.validation_error,
@@ -1621,7 +1633,14 @@ def prewarm_startup_route_prefix(client: NativeLlamaClient) -> NativeRoutePrefix
         _emit_startup_prewarm_diag(mode=mode, tools_enabled=tools_enabled, result=result)
         return result
     profile = getattr(client, "model_profile", None)
-    if getattr(profile, "profile_id", None) in (QWEN3_CODER_PROFILE_ID, ORNITH15_PROFILE_ID, QWEN38_FLASH_NEXT_PROFILE_ID):
+    if getattr(profile, "profile_id", None) in (
+        QWEN3_CODER_PROFILE_ID,
+        ORNITH15_PROFILE_ID,
+        QWEN38_FLASH_NEXT_PROFILE_ID,
+        MINICPM5_PROFILE_ID,
+        GRANITE42_PROFILE_ID,
+        GRANITE42_8B_PROFILE_ID,
+    ):
         try:
             result = client.capture_qwen3_coder_route_prefix_prefill_only(
                 system_prompt=ROUTE_SYSTEM_PROMPT,

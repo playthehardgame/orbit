@@ -15,7 +15,8 @@ from unittest import mock
 from orbit.native_llama.bindings import ChatBridgeLibrary, LlamaLibrary
 from orbit.native_llama.build_support import DEFAULT_VENDOR_BUILD_BIN
 from orbit.native_llama.chat_bridge import CHAT_BRIDGE_API_VERSION, chat_bridge_filename, validate_chat_bridge_artifact
-from orbit.native_llama.client import _resolve_chat_bridge_path
+from orbit.native_llama.client import NativeClientConfig, NativeLlamaClient, _resolve_chat_bridge_path
+from orbit.native_llama.paths import resolve_legacy_paths
 from orbit.native_llama.native_names import (
     mtmd_bridge_filename,
     platform_runtime_libs,
@@ -24,6 +25,140 @@ from orbit.native_llama.native_names import (
 
 
 class NativeChatBridgeTests(unittest.TestCase):
+    @unittest.skipUnless(
+        os.environ.get("ORBIT_MINICPM5_MODEL"),
+        "set ORBIT_MINICPM5_MODEL to run the MiniCPM5 native integration test",
+    )
+    def test_minicpm5_plain_text_completion_does_not_enter_broken_peg_parser(self) -> None:
+        model = Path(os.environ["ORBIT_MINICPM5_MODEL"])
+        if not model.is_file():
+            self.skipTest(f"MiniCPM5 model is not a file: {model}")
+        client = NativeLlamaClient(
+            resolve_legacy_paths(model=model),
+            NativeClientConfig(
+                context_tokens=32768,
+                threads=8,
+                threads_batch=8,
+                batch_size=256,
+                ubatch_size=128,
+                thinking=False,
+                mtp_probe_enabled=False,
+                mtp_dry_run_enabled=False,
+                mtp_accept_probe_enabled=False,
+                mtp_decode_probe_enabled=False,
+                use_mtp_experimental=False,
+            ),
+        )
+        try:
+            client.load()
+            completion = client.complete_chat_text(
+                [{"role": "user", "content": "Reply with one short greeting."}],
+                max_tokens=8,
+                tools=[],
+                thinking=False,
+                allow_mtp_experimental=False,
+            )
+        finally:
+            client.close()
+        self.assertTrue(completion.content.strip())
+        self.assertFalse(completion.timings.cancelled)
+
+    @unittest.skipUnless(
+        os.environ.get("ORBIT_GRANITE42_MODEL"),
+        "set ORBIT_GRANITE42_MODEL to run the Granite 4.2 native integration test",
+    )
+    def test_granite42_plain_text_completion_and_reasoning(self) -> None:
+        model = Path(os.environ["ORBIT_GRANITE42_MODEL"])
+        if not model.is_file():
+            self.skipTest(f"Granite 4.2 model is not a file: {model}")
+        client = NativeLlamaClient(
+            resolve_legacy_paths(model=model),
+            NativeClientConfig(
+                context_tokens=4096,
+                threads=8,
+                threads_batch=8,
+                batch_size=256,
+                ubatch_size=128,
+                thinking=False,
+                mtp_probe_enabled=False,
+                mtp_dry_run_enabled=False,
+                mtp_accept_probe_enabled=False,
+                mtp_decode_probe_enabled=False,
+                use_mtp_experimental=False,
+            ),
+        )
+        try:
+            client.load()
+            plain = client.complete_chat_text(
+                [{"role": "user", "content": "Reply with exactly: 4"}],
+                max_tokens=8,
+                tools=[],
+                thinking=False,
+                allow_mtp_experimental=False,
+            )
+            reasoning = client.complete_chat_text(
+                [{"role": "user", "content": "What is 7 times 6? Answer briefly."}],
+                max_tokens=64,
+                tools=[],
+                thinking=True,
+                allow_mtp_experimental=False,
+            )
+        finally:
+            client.close()
+        self.assertEqual(plain.content.strip(), "4")
+        self.assertEqual(reasoning.content.strip(), "42")
+        self.assertTrue(reasoning.reasoning_content.strip())
+        self.assertFalse(plain.timings.cancelled)
+        self.assertFalse(reasoning.timings.cancelled)
+
+    @unittest.skipUnless(
+        os.environ.get("ORBIT_GRANITE42_8B_MODEL"),
+        "set ORBIT_GRANITE42_8B_MODEL to run the Granite 4.2 8B native integration test",
+    )
+    def test_granite42_8b_plain_text_completion_and_reasoning(self) -> None:
+        model = Path(os.environ["ORBIT_GRANITE42_8B_MODEL"])
+        if not model.is_file():
+            self.skipTest(f"Granite 4.2 8B model is not a file: {model}")
+        client = NativeLlamaClient(
+            resolve_legacy_paths(model=model),
+            NativeClientConfig(
+                context_tokens=4096,
+                threads=8,
+                threads_batch=8,
+                batch_size=256,
+                ubatch_size=128,
+                thinking=False,
+                mtp_probe_enabled=False,
+                mtp_dry_run_enabled=False,
+                mtp_accept_probe_enabled=False,
+                mtp_decode_probe_enabled=False,
+                use_mtp_experimental=False,
+            ),
+        )
+        try:
+            client.load()
+            plain = client.complete_chat_text(
+                [{"role": "user", "content": "Reply with exactly: 8"}],
+                max_tokens=8,
+                tools=[],
+                thinking=False,
+                allow_mtp_experimental=False,
+            )
+            reasoning = client.complete_chat_text(
+                [{"role": "user", "content": "What is 7 times 6? Answer briefly."}],
+                max_tokens=96,
+                tools=[],
+                thinking=True,
+                allow_mtp_experimental=False,
+            )
+        finally:
+            client.close()
+        self.assertEqual(plain.content.strip(), "8")
+        self.assertEqual(reasoning.content.strip(), "42")
+        self.assertTrue(reasoning.reasoning_content.strip())
+        self.assertFalse(plain.timings.cancelled)
+        self.assertFalse(reasoning.timings.cancelled)
+
     def test_llama_runtime_loads_only_lower_level_dependencies_first(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             build_bin = Path(tmp)

@@ -11,6 +11,8 @@ QWEN_ROUTE_PREFIX_TOKEN_COUNT = 768
 QWEN_ROUTE_PREFIX_FORMAT_VERSION = "qwen36-route-prefix-v1"
 QWEN38_ROUTE_PREFIX_FORMAT_VERSION = "qwen38-aligned-route-prefix-v1"
 QWEN_ROUTE_TOKENIZER_IDENTITY = "gpt2:qwen35"
+GRANITE42_ROUTE_PREFIX_FORMAT_VERSION = "granite42-route-prefix-v1"
+GRANITE42_ROUTE_TOKENIZER_IDENTITY = "gpt2:granite-docling"
 
 
 @dataclass(frozen=True)

@@ -16,14 +16,24 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from .expert_usage import summarize_expert_usage
-from .model_profiles import ORNITH15_PROFILE_ID, QWEN36_PROFILE_ID, QWEN3_CODER_PROFILE_ID, QWEN38_FLASH_NEXT_PROFILE_ID
+from .model_profiles import (
+    GRANITE42_8B_PROFILE_ID,
+    GRANITE42_PROFILE_ID,
+    granite42_quantization_for_file_type,
+    MINICPM5_PROFILE_ID,
+    ORNITH15_PROFILE_ID,
+    QWEN36_PROFILE_ID,
+    QWEN3_CODER_PROFILE_ID,
+    QWEN38_FLASH_NEXT_PROFILE_ID,
+)
+from .minicpm5_route_prefix import MINICPM5_ROUTE_TOKENIZER_IDENTITY
 from .ornith_route_prefix import ORNITH_ROUTE_TOKENIZER_IDENTITY
 from .qwen36_shell_tool_prefix import (
     QWEN36_SHELL_TOOL_PREFIX_FORMAT_VERSION,
     QWEN36_SHELL_TOOL_TOKENIZER_IDENTITY,
 )
 from .qwen3_coder_route_prefix import QWEN3_CODER_ROUTE_TOKENIZER_IDENTITY
-from .qwen_route_prefix import QWEN_ROUTE_TOKENIZER_IDENTITY, hash_text
+from .qwen_route_prefix import GRANITE42_ROUTE_TOKENIZER_IDENTITY, QWEN_ROUTE_TOKENIZER_IDENTITY, hash_text
 
 if TYPE_CHECKING:  # pragma: no cover - typing only, never a runtime import
     from .client import NativeLlamaClient
@@ -61,11 +71,42 @@ def qwen_route_prefix_reuse_status(client: "NativeLlamaClient") -> dict[str, obj
             and client._model_metadata_identity.get("general.file_type") == "31"
             and client._qwen38_route_prefix_config_eligible()
         )
+    if getattr(profile, "profile_id", None) == MINICPM5_PROFILE_ID:
+        profile_eligible = (
+            getattr(profile, "verified", False)
+            and getattr(profile, "route_prefix_reuse_supported", False)
+            and client._model_metadata_identity.get("general.file_type") == "15"
+        )
+    if getattr(profile, "profile_id", None) in (GRANITE42_PROFILE_ID, GRANITE42_8B_PROFILE_ID):
+        profile_eligible = (
+            getattr(profile, "verified", False)
+            and getattr(profile, "route_prefix_reuse_supported", False)
+            and granite42_quantization_for_file_type(
+                profile.profile_id,
+                client._model_metadata_identity.get("general.file_type", ""),
+            )
+            is not None
+        )
     spec = client._qwen_route_prefix_spec
+    enabled = (
+        client.config.minicpm5_route_prefix_reuse_enabled
+        if getattr(profile, "profile_id", None) == MINICPM5_PROFILE_ID
+        else client.config.qwen_route_prefix_reuse_enabled
+    )
+    source = (
+        client.config.minicpm5_route_prefix_reuse_source
+        if getattr(profile, "profile_id", None) == MINICPM5_PROFILE_ID
+        else client.config.qwen_route_prefix_reuse_source
+    )
+    config_error = (
+        client.config.minicpm5_route_prefix_reuse_config_error
+        if getattr(profile, "profile_id", None) == MINICPM5_PROFILE_ID
+        else client.config.qwen_route_prefix_reuse_config_error
+    )
     return {
-        "enabled": client.config.qwen_route_prefix_reuse_enabled and profile_eligible,
-        "source": client.config.qwen_route_prefix_reuse_source,
-        "config_error": client.config.qwen_route_prefix_reuse_config_error,
+        "enabled": enabled and profile_eligible,
+        "source": source,
+        "config_error": config_error,
         "initialized": status.initialized,
         "prefix_tokens": status.prefix_tokens,
         "capture_count": status.capture_count,
@@ -77,7 +118,13 @@ def qwen_route_prefix_reuse_status(client: "NativeLlamaClient") -> dict[str, obj
         "checkpoint_size_bytes": client._qwen_route_prefix_anchor_state.checkpoint_size,
         "profile_identity": getattr(profile, "profile_id", None),
         "template_identity": getattr(profile, "template_sha256", None),
-        "tokenizer_identity": hash_text(QWEN_ROUTE_TOKENIZER_IDENTITY),
+        "tokenizer_identity": hash_text(
+            MINICPM5_ROUTE_TOKENIZER_IDENTITY
+            if getattr(profile, "profile_id", None) == MINICPM5_PROFILE_ID
+            else GRANITE42_ROUTE_TOKENIZER_IDENTITY
+            if getattr(profile, "profile_id", None) in (GRANITE42_PROFILE_ID, GRANITE42_8B_PROFILE_ID)
+            else QWEN_ROUTE_TOKENIZER_IDENTITY
+        ),
         "prefix_token_hash": spec.prefix_token_hash if spec is not None else None,
         "prefix_text_hash": spec.invariant_text_hash if spec is not None else None,
     }

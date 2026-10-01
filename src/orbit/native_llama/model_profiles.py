@@ -59,6 +59,10 @@ PROFILE_METADATA_KEYS = frozenset(
         "qwen4exp.block_count",
         "qwen4exp.expert_count",
         "qwen4exp.expert_used_count",
+        "llama.context_length",
+        "llama.block_count",
+        "granite.context_length",
+        "granite.block_count",
     }
 )
 
@@ -72,6 +76,41 @@ QWEN3_CODER_VERIFIED_MODEL_NAME = "Qwen3-Coder-30B-A3B-Instruct"
 QWEN3_CODER_OFFICIAL_TEMPLATE_SHA256 = "87710339d25b4e789c1d723f93c91ee861a86d305bb3d20a845536f251d6ea8a"
 QWEN3_CODER_VERIFIED_FILE_TYPE = "15"
 QWEN3_CODER_VERIFIED_QUANTIZATION = "Q4_K_M"
+MINICPM5_PROFILE_ID = "orbit-minicpm5-native-v1"
+MINICPM5_VERIFIED_MODEL_NAME = "MiniCPM5 2B"
+MINICPM5_OFFICIAL_TEMPLATE_SHA256 = "cc945752db555d60949b16989df4ccfeb52a313d6b4b5c5229dd786e2e9fcf1c"
+MINICPM5_VERIFIED_FILE_TYPE = "15"
+MINICPM5_VERIFIED_QUANTIZATION = "Q4_K_M"
+GRANITE42_PROFILE_ID = "orbit-granite42-native-v1"
+GRANITE42_VERIFIED_MODEL_NAME = "Granite 4.2 3b"
+GRANITE42_OFFICIAL_TEMPLATE_SHA256 = "f0ba43f79b3cabca5e5a7584c77aec92f49feae45cdf7779c87d9fc54cd90258"
+GRANITE42_VERIFIED_FILE_TYPE = "15"
+GRANITE42_VERIFIED_QUANTIZATION = "Q4_K_M"
+GRANITE42_3B_VERIFIED_FILE_TYPES = frozenset({"7", "15"})
+GRANITE42_8B_PROFILE_ID = "orbit-granite42-8b-native-v1"
+GRANITE42_8B_VERIFIED_MODEL_NAME = "Granite 4.2 8b"
+GRANITE42_8B_VERIFIED_FILE_TYPES = frozenset({"15", "18"})
+
+_GRANITE42_QUANTIZATIONS = {
+    "7": "Q8_0",
+    "15": "Q4_K_M",
+    "18": "Q6_K",
+}
+
+
+def granite42_quantization_for_file_type(
+    profile_id: str, file_type: str
+) -> str | None:
+    allowed = (
+        GRANITE42_3B_VERIFIED_FILE_TYPES
+        if profile_id == GRANITE42_PROFILE_ID
+        else GRANITE42_8B_VERIFIED_FILE_TYPES
+        if profile_id == GRANITE42_8B_PROFILE_ID
+        else frozenset()
+    )
+    if file_type not in allowed:
+        return None
+    return _GRANITE42_QUANTIZATIONS[file_type]
 
 
 @dataclass(frozen=True)
@@ -214,6 +253,21 @@ VERIFIED_NATIVE_MODEL_IDENTITIES = (
         QWEN3_CODER_VERIFIED_MODEL_NAME,
         "qwen3moe",
     ),
+    VerifiedNativeModelIdentity(
+        MINICPM5_PROFILE_ID,
+        MINICPM5_VERIFIED_MODEL_NAME,
+        "llama",
+    ),
+        VerifiedNativeModelIdentity(
+            GRANITE42_PROFILE_ID,
+            GRANITE42_VERIFIED_MODEL_NAME,
+            "granite",
+        ),
+        VerifiedNativeModelIdentity(
+            GRANITE42_8B_PROFILE_ID,
+            GRANITE42_8B_VERIFIED_MODEL_NAME,
+            "granite",
+        ),
 )
 
 
@@ -444,6 +498,109 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             artifact_content_protocol="qwen3-coder-json-string-v1",
         )
 
+    minicpm5_identity = (
+        architecture == "llama"
+        and model_name == MINICPM5_VERIFIED_MODEL_NAME
+        and tokenizer_model == "gpt2"
+        and tokenizer_pre == "minicpm5"
+        and file_type == MINICPM5_VERIFIED_FILE_TYPE
+        and metadata.get("tokenizer.ggml.bos_token_id", "").strip() == "0"
+        and metadata.get("tokenizer.ggml.eos_token_id", "").strip() == "1"
+        and metadata.get("tokenizer.ggml.padding_token_id", "").strip() == "1"
+        and metadata.get("tokenizer.ggml.add_bos_token", "").strip().lower() == "false"
+        and metadata.get("llama.context_length", "").strip() == "131072"
+        and metadata.get("llama.block_count", "").strip() == "42"
+        and template_hash == MINICPM5_OFFICIAL_TEMPLATE_SHA256
+    )
+    if minicpm5_identity:
+        return NativeModelProfile(
+            profile_id=MINICPM5_PROFILE_ID,
+            family="minicpm5",
+            model_name=model_name,
+            architecture=architecture,
+            renderer="llama.cpp-jinja",
+            reasoning_protocol="minicpm5-think",
+            tool_call_protocol="minicpm5-xml",
+            history_serialization="orbit-native-roles",
+            verified=True,
+            failure_reason=None,
+            template_source="gguf-embedded-official",
+            template_sha256=template_hash,
+            thinking_supported=True,
+            mtp_supported=False,
+            gemma_prefix_reuse_supported=False,
+            verified_quantization=MINICPM5_VERIFIED_QUANTIZATION,
+            route_prefix_reuse_supported=True,
+        )
+
+    granite42_identity = (
+        architecture == "granite"
+        and model_name == GRANITE42_VERIFIED_MODEL_NAME
+        and tokenizer_model == "gpt2"
+        and tokenizer_pre == "granite-docling"
+        and file_type in GRANITE42_3B_VERIFIED_FILE_TYPES
+        and metadata.get("tokenizer.ggml.bos_token_id", "").strip() == "100283"
+        and metadata.get("tokenizer.ggml.eos_token_id", "").strip() == "100257"
+        and metadata.get("tokenizer.ggml.padding_token_id", "").strip() == "100257"
+        and metadata.get("granite.context_length", "").strip() == "131072"
+        and metadata.get("granite.block_count", "").strip() == "40"
+        and template_hash == GRANITE42_OFFICIAL_TEMPLATE_SHA256
+    )
+    if granite42_identity:
+        return NativeModelProfile(
+            profile_id=GRANITE42_PROFILE_ID,
+            family="granite4.2",
+            model_name=model_name,
+            architecture=architecture,
+            renderer="llama.cpp-jinja",
+            reasoning_protocol="granite-think",
+            tool_call_protocol="qwen3-coder-xml",
+            history_serialization="granite-chatml",
+            verified=True,
+            failure_reason=None,
+            template_source="gguf-embedded-official",
+            template_sha256=template_hash,
+            thinking_supported=True,
+            mtp_supported=False,
+            gemma_prefix_reuse_supported=False,
+            verified_quantization=_GRANITE42_QUANTIZATIONS[file_type],
+            route_prefix_reuse_supported=True,
+        )
+
+    granite42_8b_identity = (
+        architecture == "granite"
+        and model_name == GRANITE42_8B_VERIFIED_MODEL_NAME
+        and tokenizer_model == "gpt2"
+        and tokenizer_pre == "granite-docling"
+        and file_type in GRANITE42_8B_VERIFIED_FILE_TYPES
+        and metadata.get("tokenizer.ggml.bos_token_id", "").strip() == "100283"
+        and metadata.get("tokenizer.ggml.eos_token_id", "").strip() == "100257"
+        and metadata.get("tokenizer.ggml.padding_token_id", "").strip() == "100257"
+        and metadata.get("granite.context_length", "").strip() == "131072"
+        and metadata.get("granite.block_count", "").strip() == "40"
+        and template_hash == GRANITE42_OFFICIAL_TEMPLATE_SHA256
+    )
+    if granite42_8b_identity:
+        return NativeModelProfile(
+            profile_id=GRANITE42_8B_PROFILE_ID,
+            family="granite4.2",
+            model_name=model_name,
+            architecture=architecture,
+            renderer="llama.cpp-jinja",
+            reasoning_protocol="granite-think",
+            tool_call_protocol="qwen3-coder-xml",
+            history_serialization="granite-chatml",
+            verified=True,
+            failure_reason=None,
+            template_source="gguf-embedded-official",
+            template_sha256=template_hash,
+            thinking_supported=True,
+            mtp_supported=False,
+            gemma_prefix_reuse_supported=False,
+            verified_quantization=_GRANITE42_QUANTIZATIONS[file_type],
+            route_prefix_reuse_supported=True,
+        )
+
     reason = _unverified_reason(
         architecture=architecture,
         model_name=model_name,
@@ -529,6 +686,34 @@ def _unverified_reason(
         if template_hash != QWEN3_CODER_OFFICIAL_TEMPLATE_SHA256:
             return "qwen3_coder_template_identity_mismatch"
         return "qwen3_coder_metadata_identity_mismatch"
+    if architecture == "llama":
+        if model_name != MINICPM5_VERIFIED_MODEL_NAME:
+            return "minicpm5_model_identity_mismatch"
+        if tokenizer_model != "gpt2" or tokenizer_pre != "minicpm5":
+            return "minicpm5_tokenizer_identity_mismatch"
+        if file_type != MINICPM5_VERIFIED_FILE_TYPE:
+            return "minicpm5_quantization_identity_mismatch"
+        if template_hash != MINICPM5_OFFICIAL_TEMPLATE_SHA256:
+            return "minicpm5_template_identity_mismatch"
+        return "minicpm5_metadata_identity_mismatch"
+    if architecture == "granite":
+        if model_name not in (GRANITE42_VERIFIED_MODEL_NAME, GRANITE42_8B_VERIFIED_MODEL_NAME):
+            return "granite42_model_identity_mismatch"
+        if tokenizer_model != "gpt2" or tokenizer_pre != "granite-docling":
+            return "granite42_tokenizer_identity_mismatch"
+        if (
+            model_name == GRANITE42_VERIFIED_MODEL_NAME
+            and file_type not in GRANITE42_3B_VERIFIED_FILE_TYPES
+        ):
+            return "granite42_quantization_identity_mismatch"
+        if (
+            model_name == GRANITE42_8B_VERIFIED_MODEL_NAME
+            and file_type not in GRANITE42_8B_VERIFIED_FILE_TYPES
+        ):
+            return "granite42_quantization_identity_mismatch"
+        if template_hash != GRANITE42_OFFICIAL_TEMPLATE_SHA256:
+            return "granite42_template_identity_mismatch"
+        return "granite42_metadata_identity_mismatch"
     return "unsupported_model_profile"
 
 

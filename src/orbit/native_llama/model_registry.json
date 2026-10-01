@@ -85,6 +85,42 @@
         "file": "Qwen3.8-Flash-Next-UD-IQ1_M-00001-of-00003.gguf",
         "cache_glob": "models--unsloth--Qwen3.8-Flash-Next-GGUF/snapshots/*/Qwen3.8-Flash-Next-UD-IQ1_M-00001-of-00003.gguf"
       }
+    },
+    {
+      "id": "minicpm5-2b-q4-k-m",
+      "display_name": "MiniCPM5 2B",
+      "profile_id": "orbit-minicpm5-native-v1",
+      "backend": "native-llama",
+      "architecture": "llama",
+      "target": {
+        "repo": "bartowski/MiniCPM5-2B-GGUF",
+        "file": "MiniCPM5-2B-Q4_K_M.gguf",
+        "cache_glob": "models--bartowski--MiniCPM5-2B-GGUF/snapshots/*/MiniCPM5-2B-Q4_K_M.gguf"
+      }
+    },
+    {
+      "id": "granite42-3b-q4-k-m",
+      "display_name": "Granite 4.2 3B",
+      "profile_id": "orbit-granite42-native-v1",
+      "backend": "native-llama",
+      "architecture": "granite",
+      "target": {
+        "repo": "ibm-granite/granite-4.2-3b-GGUF",
+        "file": "granite-4.2-3b-Q4_K_M.gguf",
+        "cache_glob": "models--ibm-granite--granite-4.2-3b-GGUF/snapshots/*/granite-4.2-3b-Q4_K_M.gguf"
+      }
+    },
+    {
+      "id": "granite42-8b-q4-k-m",
+      "display_name": "Granite 4.2 8B",
+      "profile_id": "orbit-granite42-8b-native-v1",
+      "backend": "native-llama",
+      "architecture": "granite",
+      "target": {
+        "repo": "ibm-granite/granite-4.2-8b-GGUF",
+        "file": "granite-4.2-8b-Q4_K_M.gguf",
+        "cache_glob": "models--ibm-granite--granite-4.2-8b-GGUF/snapshots/*/granite-4.2-8b-Q4_K_M.gguf"
+      }
     }
   ]
 }

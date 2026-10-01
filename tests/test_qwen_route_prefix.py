@@ -10,7 +10,12 @@ from orbit.native_llama.client import (
     NativeLlamaClient,
     _QwenRouteAnchorRuntimePlan,
 )
-from orbit.native_llama.model_profiles import NativeModelProfile, QWEN36_PROFILE_ID
+from orbit.native_llama.model_profiles import (
+    GRANITE42_8B_PROFILE_ID,
+    GRANITE42_PROFILE_ID,
+    NativeModelProfile,
+    QWEN36_PROFILE_ID,
+)
 from orbit.native_llama.paths import NativeLlamaPaths
 from orbit.native_llama.prefix_anchor import PrefixAnchorState
 from orbit.native_llama.qwen_route_prefix import (
@@ -105,6 +110,28 @@ def _profile() -> NativeModelProfile:
     )
 
 
+def _granite_profile(profile_id: str, model_name: str) -> NativeModelProfile:
+    return NativeModelProfile(
+        profile_id=profile_id,
+        family="granite4.2",
+        model_name=model_name,
+        architecture="granite",
+        renderer="llama.cpp-jinja",
+        reasoning_protocol="granite-think",
+        tool_call_protocol="qwen3-coder-xml",
+        history_serialization="granite-chatml",
+        verified=True,
+        failure_reason=None,
+        template_source="gguf-embedded-official",
+        template_sha256="b" * 64,
+        thinking_supported=True,
+        mtp_supported=False,
+        gemma_prefix_reuse_supported=False,
+        verified_quantization="Q8_0" if profile_id == GRANITE42_PROFILE_ID else "Q6_K",
+        route_prefix_reuse_supported=True,
+    )
+
+
 class QwenRoutePrefixClientTests(unittest.TestCase):
     def _client(self) -> NativeLlamaClient:
         paths = NativeLlamaPaths(
@@ -160,6 +187,39 @@ class QwenRoutePrefixClientTests(unittest.TestCase):
 
         self.assertIsNone(plan)
         self.assertEqual(client.qwen_route_prefix_reuse_status()["failure_reason"], "qwen_quantization_unverified")
+
+    def test_granite_q8_and_q6_route_prefixes_are_eligible(self) -> None:
+        for profile_id, model_name, file_type in (
+            (GRANITE42_PROFILE_ID, "Granite 4.2 3b", "7"),
+            (GRANITE42_8B_PROFILE_ID, "Granite 4.2 8b", "18"),
+        ):
+            with self.subTest(profile_id=profile_id):
+                client = self._client()
+                client.model_profile = _granite_profile(profile_id, model_name)
+                client._model_metadata_identity.update(
+                    {
+                        "general.architecture": "granite",
+                        "general.name": model_name,
+                        "general.file_type": file_type,
+                        "tokenizer.ggml.model": "gpt2",
+                        "tokenizer.ggml.pre": "granite-docling",
+                    }
+                )
+                system = "s" * 900
+                messages = [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": "hello"},
+                ]
+
+                plan = client._qwen_route_anchor_plan_for_prompt(
+                    messages,
+                    tools=None,
+                    thinking=False,
+                    prompt=system + "\n<user>hello</user>",
+                )
+
+                self.assertIsNotNone(plan)
+                self.assertTrue(client.qwen_route_prefix_reuse_status()["enabled"])
 
     def test_thinking_and_mtp_are_ineligible(self) -> None:
         system = "s" * 900

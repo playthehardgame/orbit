@@ -43,6 +43,10 @@ from .kv_diag import build_prompt_component_tokens, emit_decode_kv_state, emit_p
 from .multimodal import flatten_message_content, prepare_multimodal_messages
 from .artifact_capabilities import verified_artifact_supports
 from .model_profiles import (
+    GRANITE42_8B_PROFILE_ID,
+    GRANITE42_PROFILE_ID,
+    granite42_quantization_for_file_type,
+    MINICPM5_PROFILE_ID,
     ORNITH15_PROFILE_ID,
     PROFILE_METADATA_KEYS,
     QWEN36_PROFILE_ID,
@@ -88,6 +92,8 @@ from .prefix_anchor import (
     restore_prefix_anchor,
 )
 from .qwen_route_prefix import (
+    GRANITE42_ROUTE_PREFIX_FORMAT_VERSION,
+    GRANITE42_ROUTE_TOKENIZER_IDENTITY,
     QWEN_ROUTE_PREFIX_FORMAT_VERSION,
     QWEN38_ROUTE_PREFIX_FORMAT_VERSION,
     QWEN_ROUTE_PREFIX_TOKEN_COUNT,
@@ -124,6 +130,12 @@ from .ornith_route_prefix import (
     ORNITH_ROUTE_PREFIX_TOKEN_COUNT,
     ORNITH_ROUTE_TOKENIZER_IDENTITY,
     derive_ornith_route_prefix_spec,
+)
+from .minicpm5_route_prefix import (
+    MINICPM5_ROUTE_PREFIX_FORMAT_VERSION,
+    MINICPM5_ROUTE_PREFIX_TOKEN_COUNT,
+    MINICPM5_ROUTE_TOKENIZER_IDENTITY,
+    derive_minicpm5_route_prefix_spec,
 )
 from .qwen3_coder_route_prefix import (
     QWEN3_CODER_ROUTE_PREFIX_FORMAT_VERSION,
@@ -206,6 +218,9 @@ class NativeClientConfig:
     qwen_route_prefix_reuse_enabled: bool = False
     qwen_route_prefix_reuse_source: str = "default"
     qwen_route_prefix_reuse_config_error: str | None = None
+    minicpm5_route_prefix_reuse_enabled: bool = False
+    minicpm5_route_prefix_reuse_source: str = "default"
+    minicpm5_route_prefix_reuse_config_error: str | None = None
     qwen36_shell_tool_prefix_reuse_enabled: bool = False
     qwen36_shell_tool_prefix_reuse_source: str = "default"
     qwen36_shell_tool_prefix_reuse_config_error: str | None = None
@@ -581,6 +596,9 @@ class NativeLlamaClient:
         if self._model or self._session.ctx_tgt:
             self._invalidate_qwen_route_prefix(
                 "model_reload", profile_id=QWEN3_CODER_PROFILE_ID
+            )
+            self._invalidate_qwen_route_prefix(
+                "model_reload", profile_id=MINICPM5_PROFILE_ID
             )
         if getattr(getattr(self, "model_profile", None), "profile_id", None) == QWEN38_FLASH_NEXT_PROFILE_ID:
             self._invalidate_qwen_route_prefix("model_reload", profile_id=QWEN38_FLASH_NEXT_PROFILE_ID)
@@ -974,6 +992,12 @@ class NativeLlamaClient:
         self._invalidate_qwen_route_prefix(
             "session_reset", profile_id=ORNITH_ANALYSIS_LINEAGE_ID
         )
+        self._invalidate_qwen_route_prefix(
+            "session_reset", profile_id=GRANITE42_PROFILE_ID
+        )
+        self._invalidate_qwen_route_prefix(
+            "session_reset", profile_id=GRANITE42_8B_PROFILE_ID
+        )
         self._invalidate_qwen36_shell_tool_prefix("session_reset")
         if self._persistent_mtp_runtime is None:
             return
@@ -1032,6 +1056,8 @@ class NativeLlamaClient:
             QWEN3_CODER_PROFILE_ID,
             ORNITH15_PROFILE_ID,
             QWEN38_FLASH_NEXT_PROFILE_ID,
+            GRANITE42_PROFILE_ID,
+            GRANITE42_8B_PROFILE_ID,
         ):
             self._invalidate_qwen_route_prefix(reason, profile_id=profile_id)
 
@@ -1133,7 +1159,10 @@ class NativeLlamaClient:
         should_cancel=None,
     ) -> NativeRoutePrefixPrefillResult:
         profile = getattr(self, "model_profile", None)
-        if profile is not None and not profile.gemma_prefix_reuse_supported:
+        if profile is not None and not (
+            profile.gemma_prefix_reuse_supported
+            or getattr(profile, "route_prefix_reuse_supported", False)
+        ):
             return _route_prefix_prefill_skipped("model_profile_ineligible")
         if tools_mode != "on":
             return _route_prefix_prefill_skipped("tools_mode_ineligible")
@@ -1257,7 +1286,14 @@ class NativeLlamaClient:
         # These ChatML-family route-prefix profiles capture identically; only
         # the rendered tokens and the config switch differ.
         if (
-            profile_id not in (QWEN3_CODER_PROFILE_ID, ORNITH15_PROFILE_ID, QWEN38_FLASH_NEXT_PROFILE_ID)
+            profile_id not in (
+                QWEN3_CODER_PROFILE_ID,
+                ORNITH15_PROFILE_ID,
+                QWEN38_FLASH_NEXT_PROFILE_ID,
+                MINICPM5_PROFILE_ID,
+                GRANITE42_PROFILE_ID,
+                GRANITE42_8B_PROFILE_ID,
+            )
             or not getattr(profile, "verified", False)
             or not getattr(profile, "route_prefix_reuse_supported", False)
         ):
@@ -1275,6 +1311,10 @@ class NativeLlamaClient:
                 if profile_id == ORNITH15_PROFILE_ID
                 else self.config.qwen_route_prefix_reuse_enabled
                 if profile_id == QWEN38_FLASH_NEXT_PROFILE_ID
+                else self.config.minicpm5_route_prefix_reuse_enabled
+                if profile_id == MINICPM5_PROFILE_ID
+                else self.config.qwen_route_prefix_reuse_enabled
+                if profile_id in (GRANITE42_PROFILE_ID, GRANITE42_8B_PROFILE_ID)
                 else self.config.qwen3_coder_route_prefix_reuse_enabled
             )
         if not reuse_enabled:
@@ -3129,6 +3169,14 @@ class NativeLlamaClient:
             enabled = self.config.ornith_route_prefix_reuse_enabled
             prefix_token_count = ORNITH_ROUTE_PREFIX_TOKEN_COUNT
             derive_spec = derive_ornith_route_prefix_spec
+        elif profile_id == MINICPM5_PROFILE_ID:
+            enabled = self.config.minicpm5_route_prefix_reuse_enabled
+            prefix_token_count = MINICPM5_ROUTE_PREFIX_TOKEN_COUNT
+            derive_spec = derive_minicpm5_route_prefix_spec
+        elif profile_id in (GRANITE42_PROFILE_ID, GRANITE42_8B_PROFILE_ID):
+            enabled = self.config.qwen_route_prefix_reuse_enabled
+            prefix_token_count = QWEN_ROUTE_PREFIX_TOKEN_COUNT
+            derive_spec = derive_qwen_route_prefix_spec
         else:
             return None
         if not enabled:
@@ -3136,8 +3184,14 @@ class NativeLlamaClient:
         if not getattr(profile, "verified", False) or not getattr(profile, "route_prefix_reuse_supported", False):
             self._record_qwen_route_prefix_fallback("model_profile_ineligible", profile_id=profile_id)
             return None
-        file_type = "31" if profile_id == QWEN38_FLASH_NEXT_PROFILE_ID else "15"
-        if self._model_metadata_identity.get("general.file_type") != file_type:
+        file_type = self._model_metadata_identity.get("general.file_type", "")
+        if profile_id == QWEN38_FLASH_NEXT_PROFILE_ID:
+            file_type_ok = file_type == "31"
+        elif profile_id in (GRANITE42_PROFILE_ID, GRANITE42_8B_PROFILE_ID):
+            file_type_ok = granite42_quantization_for_file_type(profile_id, file_type) is not None
+        else:
+            file_type_ok = file_type == "15"
+        if not file_type_ok:
             self._record_qwen_route_prefix_fallback("qwen_quantization_unverified", profile_id=profile_id)
             return None
         if thinking:
@@ -3727,6 +3781,14 @@ class NativeLlamaClient:
             format_version = ORNITH_ROUTE_PREFIX_FORMAT_VERSION
             tokenizer_identity = ORNITH_ROUTE_TOKENIZER_IDENTITY
             tools_mode = "ornith-route-tools-on-thinking-off"
+        elif profile_id == MINICPM5_PROFILE_ID:
+            format_version = MINICPM5_ROUTE_PREFIX_FORMAT_VERSION
+            tokenizer_identity = MINICPM5_ROUTE_TOKENIZER_IDENTITY
+            tools_mode = "minicpm5-route-tools-on-thinking-off"
+        elif profile_id in (GRANITE42_PROFILE_ID, GRANITE42_8B_PROFILE_ID):
+            format_version = GRANITE42_ROUTE_PREFIX_FORMAT_VERSION
+            tokenizer_identity = GRANITE42_ROUTE_TOKENIZER_IDENTITY
+            tools_mode = "granite42-route-tools-on-thinking-off"
         elif profile_id == ORNITH_ANALYSIS_LINEAGE_ID:
             # Same model, entirely different opening tokens, so the identity
             # has to say so or a CHAT checkpoint could look valid here.
@@ -3829,6 +3891,9 @@ class NativeLlamaClient:
                 QWEN3_CODER_PROFILE_ID,
                 ORNITH15_PROFILE_ID,
                 ORNITH_ANALYSIS_LINEAGE_ID,
+                MINICPM5_PROFILE_ID,
+                GRANITE42_PROFILE_ID,
+                GRANITE42_8B_PROFILE_ID,
             )
         )
         for selected_profile_id in profile_ids:
@@ -4525,7 +4590,10 @@ class NativeLlamaClient:
         prompt: str,
     ) -> RoutePromptSegments | None:
         profile = getattr(self, "model_profile", None)
-        if profile is not None and not profile.gemma_prefix_reuse_supported:
+        if profile is not None and not (
+            profile.gemma_prefix_reuse_supported
+            or getattr(profile, "route_prefix_reuse_supported", False)
+        ):
             emit_route_prefix_anchor_event(
                 _route_anchor_metadata(
                     enabled=False,

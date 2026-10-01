@@ -8,6 +8,9 @@ from unittest import mock
 from orbit.native_llama.capabilities import LlamaCppBuildInfo, safe_native_capability_manifest
 from orbit.native_llama.model_profiles import (
     GEMMA4_PROFILE_ID,
+    GRANITE42_PROFILE_ID,
+    GRANITE42_8B_PROFILE_ID,
+    MINICPM5_PROFILE_ID,
     QWEN36_PROFILE_ID,
     QWEN3_CODER_PROFILE_ID,
     QWEN38_PROFILE_ID,
@@ -54,6 +57,38 @@ QWEN38_METADATA = {
     "qwen35.block_count": "65",
 }
 
+MINICPM5_METADATA = {
+    "general.architecture": "llama",
+    "general.name": "MiniCPM5 2B",
+    "general.file_type": "15",
+    "tokenizer.ggml.model": "gpt2",
+    "tokenizer.ggml.pre": "minicpm5",
+    "tokenizer.ggml.bos_token_id": "0",
+    "tokenizer.ggml.eos_token_id": "1",
+    "tokenizer.ggml.padding_token_id": "1",
+    "tokenizer.ggml.add_bos_token": "false",
+    "llama.context_length": "131072",
+    "llama.block_count": "42",
+}
+
+GRANITE42_METADATA = {
+    "general.architecture": "granite",
+    "general.name": "Granite 4.2 3b",
+    "general.file_type": "15",
+    "tokenizer.ggml.model": "gpt2",
+    "tokenizer.ggml.pre": "granite-docling",
+    "tokenizer.ggml.bos_token_id": "100283",
+    "tokenizer.ggml.eos_token_id": "100257",
+    "tokenizer.ggml.padding_token_id": "100257",
+    "granite.context_length": "131072",
+    "granite.block_count": "40",
+}
+
+GRANITE42_8B_METADATA = {
+    **GRANITE42_METADATA,
+    "general.name": "Granite 4.2 8b",
+}
+
 
 class Qwen38ProfileTests(unittest.TestCase):
     """Qwen3.8 is a distinct dense `qwen35` identity, isolated from Qwen3.6."""
@@ -70,6 +105,7 @@ class Qwen38ProfileTests(unittest.TestCase):
         self.assertEqual(profile.profile_id, QWEN38_PROFILE_ID)
         self.assertNotEqual(profile.profile_id, QWEN36_PROFILE_ID)
         self.assertTrue(profile.verified)
+        self.assertIsNone(profile.failure_reason)
         self.assertEqual(profile.family, "qwen3.8")
         self.assertEqual(profile.architecture, "qwen35")
         self.assertEqual(profile.renderer, "llama.cpp-jinja")
@@ -154,6 +190,112 @@ class Qwen38ProfileTests(unittest.TestCase):
 
 
 class NativeModelProfileTests(unittest.TestCase):
+    def test_detects_verified_granite42_only_from_exact_gguf_identity(self) -> None:
+        template = "official-granite42-template"
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        with mock.patch("orbit.native_llama.model_profiles.GRANITE42_OFFICIAL_TEMPLATE_SHA256", digest):
+            profile = detect_native_model_profile(GRANITE42_METADATA, template)
+
+        self.assertEqual(profile.profile_id, GRANITE42_PROFILE_ID)
+        self.assertTrue(profile.verified)
+        self.assertEqual(profile.family, "granite4.2")
+        self.assertEqual(profile.tool_call_protocol, "qwen3-coder-xml")
+        self.assertTrue(profile.thinking_supported)
+        self.assertTrue(profile.route_prefix_reuse_supported)
+        self.assertEqual(profile.verified_quantization, "Q4_K_M")
+
+    def test_granite42_identity_drift_fails_closed(self) -> None:
+        template = "official-granite42-template"
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        with mock.patch("orbit.native_llama.model_profiles.GRANITE42_OFFICIAL_TEMPLATE_SHA256", digest):
+            for key, value in (
+                ("general.name", "Granite 4.2 9b"),
+                ("tokenizer.ggml.pre", "gpt2"),
+                ("granite.block_count", "39"),
+                ("tokenizer.ggml.eos_token_id", "1"),
+            ):
+                with self.subTest(key=key):
+                    profile = detect_native_model_profile({**GRANITE42_METADATA, key: value}, template)
+                    self.assertFalse(profile.verified)
+                    self.assertNotEqual(profile.profile_id, GRANITE42_PROFILE_ID)
+
+    def test_detects_verified_granite42_8b_identity(self) -> None:
+        template = "official-granite42-template"
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        with mock.patch("orbit.native_llama.model_profiles.GRANITE42_OFFICIAL_TEMPLATE_SHA256", digest):
+            profile = detect_native_model_profile(GRANITE42_8B_METADATA, template)
+
+        self.assertEqual(profile.profile_id, GRANITE42_8B_PROFILE_ID)
+        self.assertTrue(profile.verified)
+        self.assertTrue(profile.route_prefix_reuse_supported)
+
+    def test_accepts_qualified_granite42_q8_and_q6_variants(self) -> None:
+        template = "official-granite42-template"
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        with mock.patch("orbit.native_llama.model_profiles.GRANITE42_OFFICIAL_TEMPLATE_SHA256", digest):
+            q8 = detect_native_model_profile(
+                {**GRANITE42_METADATA, "general.file_type": "7"},
+                template,
+            )
+            q6 = detect_native_model_profile(
+                {**GRANITE42_8B_METADATA, "general.file_type": "18"},
+                template,
+            )
+
+        self.assertEqual(q8.profile_id, GRANITE42_PROFILE_ID)
+        self.assertEqual(q8.verified_quantization, "Q8_0")
+        self.assertEqual(q6.profile_id, GRANITE42_8B_PROFILE_ID)
+        self.assertEqual(q6.verified_quantization, "Q6_K")
+
+    def test_granite42_cross_variant_quantization_fails_closed(self) -> None:
+        template = "official-granite42-template"
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        with mock.patch("orbit.native_llama.model_profiles.GRANITE42_OFFICIAL_TEMPLATE_SHA256", digest):
+            q6_for_3b = detect_native_model_profile(
+                {**GRANITE42_METADATA, "general.file_type": "18"},
+                template,
+            )
+            q8_for_8b = detect_native_model_profile(
+                {**GRANITE42_8B_METADATA, "general.file_type": "7"},
+                template,
+            )
+
+        self.assertEqual(q6_for_3b.failure_reason, "granite42_quantization_identity_mismatch")
+        self.assertEqual(q8_for_8b.failure_reason, "granite42_quantization_identity_mismatch")
+
+    def test_detects_verified_minicpm5_only_from_exact_gguf_identity(self) -> None:
+        template = "official-minicpm5-template"
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        with mock.patch("orbit.native_llama.model_profiles.MINICPM5_OFFICIAL_TEMPLATE_SHA256", digest):
+            profile = detect_native_model_profile(MINICPM5_METADATA, template)
+
+        self.assertEqual(profile.profile_id, MINICPM5_PROFILE_ID)
+        self.assertTrue(profile.verified)
+        self.assertIsNone(profile.failure_reason)
+        self.assertEqual(profile.family, "minicpm5")
+        self.assertEqual(profile.architecture, "llama")
+        self.assertEqual(profile.renderer, "llama.cpp-jinja")
+        self.assertEqual(profile.tool_call_protocol, "minicpm5-xml")
+        self.assertTrue(profile.thinking_supported)
+        self.assertFalse(profile.mtp_supported)
+        self.assertTrue(profile.route_prefix_reuse_supported)
+        self.assertEqual(profile.verified_quantization, "Q4_K_M")
+
+    def test_minicpm5_identity_drift_fails_closed(self) -> None:
+        template = "official-minicpm5-template"
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        with mock.patch("orbit.native_llama.model_profiles.MINICPM5_OFFICIAL_TEMPLATE_SHA256", digest):
+            for key, value in (
+                ("general.name", "MiniCPM5 1B"),
+                ("tokenizer.ggml.pre", "llama"),
+                ("general.file_type", "2"),
+                ("llama.block_count", "41"),
+            ):
+                with self.subTest(key=key):
+                    profile = detect_native_model_profile({**MINICPM5_METADATA, key: value}, template)
+                    self.assertFalse(profile.verified)
+                    self.assertNotEqual(profile.profile_id, MINICPM5_PROFILE_ID)
+
     def test_detects_verified_qwen_only_from_complete_identity(self) -> None:
         template = "official-qwen-template"
         digest = hashlib.sha256(template.encode()).hexdigest()

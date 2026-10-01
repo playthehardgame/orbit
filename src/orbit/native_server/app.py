@@ -94,6 +94,7 @@ from orbit.native_server.protocol import (
     trim_at_stop,
     validate_session_id,
 )
+from orbit.native_server.request_logging import RequestLogger
 from orbit.runtime.analysis_runtime import ANALYSIS_SYSTEM_PROMPT, ANALYSIS_TOOL_SCHEMA
 from orbit.runtime.messages import FINAL_FROM_TOOL_SYSTEM_PROMPT, ROUTE_SYSTEM_PROMPT
 from orbit.runtime.tool_healing import tool_call_healing_status
@@ -539,6 +540,8 @@ class OrbitNativeHandler(BaseHTTPRequestHandler):
     server_version = "orbit-server"
 
     def do_GET(self) -> None:
+        self._request_started = time.monotonic()
+        self._log_request("GET", payload=None)
         if self.path == "/health":
             self._json({"status": "ok"})
             return
@@ -673,20 +676,25 @@ class OrbitNativeHandler(BaseHTTPRequestHandler):
         self._json({"error": "not found"}, status=404)
 
     def do_POST(self) -> None:
+        self._request_started = time.monotonic()
         try:
             if self.path == "/diagnostics/expert-usage/reset":
+                self._log_request("POST", payload={})
                 try:
                     self._json(self._state().reset_moe_expert_usage())
                 except RuntimeError as exc:
                     self._json({"error": str(exc)}, status=409)
                 return
             if self.path == "/session/reset":
+                self._log_request("POST", payload={})
                 self._json(self._state().reset_session())
                 return
             payload = self._read_json()
         except ValueError as exc:
+            self._log_request("POST", payload=None, error=str(exc))
             self._json({"error": str(exc)}, status=400)
             return
+        self._log_request("POST", payload=payload)
 
         try:
             if self.path == "/tokens/count":
@@ -760,6 +768,35 @@ class OrbitNativeHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args: Any) -> None:
         return
 
+    def _logger(self) -> RequestLogger | None:
+        return getattr(self.server, "request_logger", None)
+
+    def _log_request(self, method: str, *, payload: dict[str, Any] | None, error: str | None = None) -> None:
+        logger = self._logger()
+        if logger is None:
+            return
+        fields: dict[str, Any] = {
+            "method": method,
+            "path": self.path,
+            "client": self.client_address[0],
+        }
+        if payload is not None:
+            fields["payload"] = payload
+        if error is not None:
+            fields["error"] = error
+        logger.write("request", **fields)
+
+    def _log_response(self, status: int, started: float) -> None:
+        logger = self._logger()
+        if logger is not None:
+            logger.write(
+                "response",
+                method=self.command,
+                path=self.path,
+                status=status,
+                duration_ms=round((time.monotonic() - started) * 1000, 3),
+            )
+
     def _state(self) -> OrbitNativeServer:
         return self.server.orbit_state  # type: ignore[attr-defined]
 
@@ -784,6 +821,7 @@ class OrbitNativeHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+            self._log_response(status, getattr(self, "_request_started", time.monotonic()))
         except CLIENT_DISCONNECT_ERRORS:
             return
 
@@ -1547,7 +1585,17 @@ def run_server(argv: list[str] | None = None) -> int:
     assert paths is not None
     _log_native_threads(client, "after prewarm, before bind")
     model_alias = resolve_model_alias(args.alias, paths)
+    request_logger: RequestLogger | None = None
+    if args.log is not None:
+        try:
+            request_logger = RequestLogger(args.log)
+        except (OSError, ValueError) as exc:
+            client.close()
+            print(f"orbit-server: cannot initialize --log {args.log}: {exc}", file=sys.stderr)
+            return 2
+        request_logger.write("server_start", argv=argv or [], log_directory=str(args.log))
     httpd = ThreadingHTTPServer((args.host, args.port), OrbitNativeHandler)
+    httpd.request_logger = request_logger  # type: ignore[attr-defined]
     httpd.orbit_state = OrbitNativeServer(client=client, model_alias=model_alias)  # type: ignore[attr-defined]
     print(f"orbit-server model: {model_alias}", flush=True)
     print(f"orbit-server listening on http://{args.host}:{args.port}", flush=True)
@@ -1561,6 +1609,9 @@ def run_server(argv: list[str] | None = None) -> int:
         httpd.orbit_state.stop_route_shadow()  # type: ignore[attr-defined]
         client.close()
         httpd.server_close()
+        if request_logger is not None:
+            request_logger.write("server_stop")
+            request_logger.close()
     return 0
 
 
@@ -1809,6 +1860,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model", type=Path, help="Legacy direct target model path override.")
     parser.add_argument("--mmproj", type=Path, help="Optional multimodal projector override for native image/audio support.")
     parser.add_argument("--models-dir", type=Path, help="Orbit local models directory.")
+    parser.add_argument(
+        "--log",
+        type=Path,
+        help="Directory for optional structured request logs (writes requests.jsonl).",
+    )
     parser.add_argument("--hf-cache", type=Path, help="Hugging Face cache root fallback.")
     parser.add_argument("--alias", help="Model name exposed by the server. Defaults to the exact GGUF filename.")
     # Default None so a qualified (machine, model) profile can supply its own

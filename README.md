@@ -39,6 +39,14 @@ first. Orbit selects the startup profile; normal use needs no tuning flags.
 Loading and any startup warm-up depend on the model. Wait for `listening on`
 before connecting.
 
+For temporary request diagnostics, pass a directory to `--log`. Orbit creates
+the directory when needed and appends structured request/response events to
+`requests.jsonl`; omitting the option keeps logging disabled:
+
+```bash
+orbit server --log workdir/server-log
+```
+
 Leave the server terminal running. In a second terminal, open the same checkout:
 
 ```bash

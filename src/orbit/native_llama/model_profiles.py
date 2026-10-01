@@ -86,8 +86,31 @@ GRANITE42_VERIFIED_MODEL_NAME = "Granite 4.2 3b"
 GRANITE42_OFFICIAL_TEMPLATE_SHA256 = "f0ba43f79b3cabca5e5a7584c77aec92f49feae45cdf7779c87d9fc54cd90258"
 GRANITE42_VERIFIED_FILE_TYPE = "15"
 GRANITE42_VERIFIED_QUANTIZATION = "Q4_K_M"
+GRANITE42_3B_VERIFIED_FILE_TYPES = frozenset({"7", "15"})
 GRANITE42_8B_PROFILE_ID = "orbit-granite42-8b-native-v1"
 GRANITE42_8B_VERIFIED_MODEL_NAME = "Granite 4.2 8b"
+GRANITE42_8B_VERIFIED_FILE_TYPES = frozenset({"15", "18"})
+
+_GRANITE42_QUANTIZATIONS = {
+    "7": "Q8_0",
+    "15": "Q4_K_M",
+    "18": "Q6_K",
+}
+
+
+def granite42_quantization_for_file_type(
+    profile_id: str, file_type: str
+) -> str | None:
+    allowed = (
+        GRANITE42_3B_VERIFIED_FILE_TYPES
+        if profile_id == GRANITE42_PROFILE_ID
+        else GRANITE42_8B_VERIFIED_FILE_TYPES
+        if profile_id == GRANITE42_8B_PROFILE_ID
+        else frozenset()
+    )
+    if file_type not in allowed:
+        return None
+    return _GRANITE42_QUANTIZATIONS[file_type]
 
 
 @dataclass(frozen=True)
@@ -515,7 +538,7 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
         and model_name == GRANITE42_VERIFIED_MODEL_NAME
         and tokenizer_model == "gpt2"
         and tokenizer_pre == "granite-docling"
-        and file_type == GRANITE42_VERIFIED_FILE_TYPE
+        and file_type in GRANITE42_3B_VERIFIED_FILE_TYPES
         and metadata.get("tokenizer.ggml.bos_token_id", "").strip() == "100283"
         and metadata.get("tokenizer.ggml.eos_token_id", "").strip() == "100257"
         and metadata.get("tokenizer.ggml.padding_token_id", "").strip() == "100257"
@@ -540,7 +563,7 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             thinking_supported=True,
             mtp_supported=False,
             gemma_prefix_reuse_supported=False,
-            verified_quantization=GRANITE42_VERIFIED_QUANTIZATION,
+            verified_quantization=_GRANITE42_QUANTIZATIONS[file_type],
             route_prefix_reuse_supported=True,
         )
 
@@ -549,7 +572,7 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
         and model_name == GRANITE42_8B_VERIFIED_MODEL_NAME
         and tokenizer_model == "gpt2"
         and tokenizer_pre == "granite-docling"
-        and file_type == GRANITE42_VERIFIED_FILE_TYPE
+        and file_type in GRANITE42_8B_VERIFIED_FILE_TYPES
         and metadata.get("tokenizer.ggml.bos_token_id", "").strip() == "100283"
         and metadata.get("tokenizer.ggml.eos_token_id", "").strip() == "100257"
         and metadata.get("tokenizer.ggml.padding_token_id", "").strip() == "100257"
@@ -574,7 +597,7 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             thinking_supported=True,
             mtp_supported=False,
             gemma_prefix_reuse_supported=False,
-            verified_quantization=GRANITE42_VERIFIED_QUANTIZATION,
+            verified_quantization=_GRANITE42_QUANTIZATIONS[file_type],
             route_prefix_reuse_supported=True,
         )
 
@@ -678,7 +701,15 @@ def _unverified_reason(
             return "granite42_model_identity_mismatch"
         if tokenizer_model != "gpt2" or tokenizer_pre != "granite-docling":
             return "granite42_tokenizer_identity_mismatch"
-        if file_type != GRANITE42_VERIFIED_FILE_TYPE:
+        if (
+            model_name == GRANITE42_VERIFIED_MODEL_NAME
+            and file_type not in GRANITE42_3B_VERIFIED_FILE_TYPES
+        ):
+            return "granite42_quantization_identity_mismatch"
+        if (
+            model_name == GRANITE42_8B_VERIFIED_MODEL_NAME
+            and file_type not in GRANITE42_8B_VERIFIED_FILE_TYPES
+        ):
             return "granite42_quantization_identity_mismatch"
         if template_hash != GRANITE42_OFFICIAL_TEMPLATE_SHA256:
             return "granite42_template_identity_mismatch"

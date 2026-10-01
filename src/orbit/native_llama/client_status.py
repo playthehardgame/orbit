@@ -19,6 +19,7 @@ from .expert_usage import summarize_expert_usage
 from .model_profiles import (
     GRANITE42_8B_PROFILE_ID,
     GRANITE42_PROFILE_ID,
+    granite42_quantization_for_file_type,
     MINICPM5_PROFILE_ID,
     ORNITH15_PROFILE_ID,
     QWEN36_PROFILE_ID,
@@ -80,7 +81,11 @@ def qwen_route_prefix_reuse_status(client: "NativeLlamaClient") -> dict[str, obj
         profile_eligible = (
             getattr(profile, "verified", False)
             and getattr(profile, "route_prefix_reuse_supported", False)
-            and client._model_metadata_identity.get("general.file_type") == "15"
+            and granite42_quantization_for_file_type(
+                profile.profile_id,
+                client._model_metadata_identity.get("general.file_type", ""),
+            )
+            is not None
         )
     spec = client._qwen_route_prefix_spec
     enabled = (

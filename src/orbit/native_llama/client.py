@@ -45,6 +45,7 @@ from .artifact_capabilities import verified_artifact_supports
 from .model_profiles import (
     GRANITE42_8B_PROFILE_ID,
     GRANITE42_PROFILE_ID,
+    granite42_quantization_for_file_type,
     MINICPM5_PROFILE_ID,
     ORNITH15_PROFILE_ID,
     PROFILE_METADATA_KEYS,
@@ -3183,8 +3184,14 @@ class NativeLlamaClient:
         if not getattr(profile, "verified", False) or not getattr(profile, "route_prefix_reuse_supported", False):
             self._record_qwen_route_prefix_fallback("model_profile_ineligible", profile_id=profile_id)
             return None
-        file_type = "31" if profile_id == QWEN38_FLASH_NEXT_PROFILE_ID else "15"
-        if self._model_metadata_identity.get("general.file_type") != file_type:
+        file_type = self._model_metadata_identity.get("general.file_type", "")
+        if profile_id == QWEN38_FLASH_NEXT_PROFILE_ID:
+            file_type_ok = file_type == "31"
+        elif profile_id in (GRANITE42_PROFILE_ID, GRANITE42_8B_PROFILE_ID):
+            file_type_ok = granite42_quantization_for_file_type(profile_id, file_type) is not None
+        else:
+            file_type_ok = file_type == "15"
+        if not file_type_ok:
             self._record_qwen_route_prefix_fallback("qwen_quantization_unverified", profile_id=profile_id)
             return None
         if thinking:

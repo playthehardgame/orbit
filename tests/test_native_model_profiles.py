@@ -229,6 +229,40 @@ class NativeModelProfileTests(unittest.TestCase):
         self.assertTrue(profile.verified)
         self.assertTrue(profile.route_prefix_reuse_supported)
 
+    def test_accepts_qualified_granite42_q8_and_q6_variants(self) -> None:
+        template = "official-granite42-template"
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        with mock.patch("orbit.native_llama.model_profiles.GRANITE42_OFFICIAL_TEMPLATE_SHA256", digest):
+            q8 = detect_native_model_profile(
+                {**GRANITE42_METADATA, "general.file_type": "7"},
+                template,
+            )
+            q6 = detect_native_model_profile(
+                {**GRANITE42_8B_METADATA, "general.file_type": "18"},
+                template,
+            )
+
+        self.assertEqual(q8.profile_id, GRANITE42_PROFILE_ID)
+        self.assertEqual(q8.verified_quantization, "Q8_0")
+        self.assertEqual(q6.profile_id, GRANITE42_8B_PROFILE_ID)
+        self.assertEqual(q6.verified_quantization, "Q6_K")
+
+    def test_granite42_cross_variant_quantization_fails_closed(self) -> None:
+        template = "official-granite42-template"
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        with mock.patch("orbit.native_llama.model_profiles.GRANITE42_OFFICIAL_TEMPLATE_SHA256", digest):
+            q6_for_3b = detect_native_model_profile(
+                {**GRANITE42_METADATA, "general.file_type": "18"},
+                template,
+            )
+            q8_for_8b = detect_native_model_profile(
+                {**GRANITE42_8B_METADATA, "general.file_type": "7"},
+                template,
+            )
+
+        self.assertEqual(q6_for_3b.failure_reason, "granite42_quantization_identity_mismatch")
+        self.assertEqual(q8_for_8b.failure_reason, "granite42_quantization_identity_mismatch")
+
     def test_detects_verified_minicpm5_only_from_exact_gguf_identity(self) -> None:
         template = "official-minicpm5-template"
         digest = hashlib.sha256(template.encode()).hexdigest()

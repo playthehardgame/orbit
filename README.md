@@ -65,10 +65,16 @@ This list is not a performance ranking.
 | Qwen3-Coder 30B-A3B Instruct | Q4_K_M |
 | Qwen3.8 27B | Q4_K_M |
 | Qwen3.8 Flash Next | UD-IQ1_M, three shards |
+| Granite 4.2 3B | Q4_K_M, Q8_0 |
+| Granite 4.2 8B | Q4_K_M, Q6_K |
 
 **Backend/CHAT qualification is separate from ANALYSIS semantic qualification.**
 A working model integration and valid tool calls do not establish that its
 explanations are correct.
+
+Granite 4.2 3B and 8B use the verified native Granite 4.2 profile. Their
+qualified route-prefix reuse is enabled for the quantizations listed above;
+other Granite variants remain unsupported until separately verified.
 
 Ornith has bounded ANALYSIS qualification on specific retained tests, but
 retained reports also contain factual errors. It is not generally qualified

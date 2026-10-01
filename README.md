@@ -81,6 +81,7 @@ This list is not a performance ranking.
 | Qwen 3.6 35B-A3B | Q4_K_M |
 | Qwen3-Coder 30B-A3B Instruct | Q4_K_M |
 | Qwen3.8 27B | Q4_K_M |
+| MiniCPM5 2B | Q4_K_M |
 | Qwen3.8 Flash Next | UD-IQ1_M, three shards |
 | Granite 4.2 3B | Q4_K_M, Q8_0 |
 | Granite 4.2 8B | Q4_K_M, Q6_K |

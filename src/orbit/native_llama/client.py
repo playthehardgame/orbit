@@ -46,6 +46,7 @@ from .model_profiles import (
     GRANITE42_8B_PROFILE_ID,
     GRANITE42_PROFILE_ID,
     granite42_quantization_for_file_type,
+    LFM25_PROFILE_ID,
     MINICPM5_PROFILE_ID,
     ORNITH15_PROFILE_ID,
     PROFILE_METADATA_KEYS,
@@ -94,6 +95,8 @@ from .prefix_anchor import (
 from .qwen_route_prefix import (
     GRANITE42_ROUTE_PREFIX_FORMAT_VERSION,
     GRANITE42_ROUTE_TOKENIZER_IDENTITY,
+    LFM25_ROUTE_PREFIX_FORMAT_VERSION,
+    LFM25_ROUTE_TOKENIZER_IDENTITY,
     QWEN_ROUTE_PREFIX_FORMAT_VERSION,
     QWEN38_ROUTE_PREFIX_FORMAT_VERSION,
     QWEN_ROUTE_PREFIX_TOKEN_COUNT,
@@ -158,7 +161,9 @@ from .session_state import DEFAULT_NATIVE_SESSION_ID, NativeSessionSnapshot, Nat
 # restored on the next route call under the exact-prefix rule). Membership is
 # a qualification decision: the state round-trip has to be demonstrated on the
 # real model. The ANALYSIS rolling lineage stays Ornith-only.
-ROLLING_ROUTE_PROFILE_IDS = frozenset({ORNITH15_PROFILE_ID, QWEN38_FLASH_NEXT_PROFILE_ID})
+ROLLING_ROUTE_PROFILE_IDS = frozenset(
+    {ORNITH15_PROFILE_ID, QWEN38_FLASH_NEXT_PROFILE_ID, LFM25_PROFILE_ID}
+)
 # The profiles whose route checkpoint is advanced past the committed reply
 # after a final call (QWEN38-POST-FINAL-ROUTE-CACHE-23). A subset of the
 # rolling set: the mechanism is generic, but each profile is admitted on its
@@ -506,7 +511,7 @@ class NativeLlamaClient:
                 int(self._model_metadata_identity[f"{architecture}.block_count"]),
                 int(self._model_metadata_identity[f"{architecture}.expert_count"]),
                 int(self._model_metadata_identity[f"{architecture}.expert_used_count"]),
-            ) if architecture in {"qwen3moe", "qwen35moe"} else None
+            ) if architecture in {"qwen3moe", "qwen35moe", "lfm2moe"} else None
         except (KeyError, ValueError):
             return None
 
@@ -3789,6 +3794,10 @@ class NativeLlamaClient:
             format_version = GRANITE42_ROUTE_PREFIX_FORMAT_VERSION
             tokenizer_identity = GRANITE42_ROUTE_TOKENIZER_IDENTITY
             tools_mode = "granite42-route-tools-on-thinking-off"
+        elif profile_id == LFM25_PROFILE_ID:
+            format_version = LFM25_ROUTE_PREFIX_FORMAT_VERSION
+            tokenizer_identity = LFM25_ROUTE_TOKENIZER_IDENTITY
+            tools_mode = "lfm25-route-tools-on-thinking-off"
         elif profile_id == ORNITH_ANALYSIS_LINEAGE_ID:
             # Same model, entirely different opening tokens, so the identity
             # has to say so or a CHAT checkpoint could look valid here.
@@ -3894,6 +3903,7 @@ class NativeLlamaClient:
                 MINICPM5_PROFILE_ID,
                 GRANITE42_PROFILE_ID,
                 GRANITE42_8B_PROFILE_ID,
+                LFM25_PROFILE_ID,
             )
         )
         for selected_profile_id in profile_ids:

@@ -64,6 +64,10 @@ class NativeModelRegistryTests(unittest.TestCase):
                 ("Ornith 1.5 35B-A3B", "orbit-ornith15-native-v1"),
                 ("Qwen3-Coder 30B-A3B", "orbit-qwen3-coder-native-v1"),
                 ("Qwen 3.8 Flash Next", "orbit-qwen38-flash-next-native-v1"),
+                ("LFM2.5 8B-A1B", "orbit-lfm25-native-v1"),
+                ("MiniCPM5 2B", "orbit-minicpm5-native-v1"),
+                ("Granite 4.2 3B", "orbit-granite42-native-v1"),
+                ("Granite 4.2 8B", "orbit-granite42-8b-native-v1"),
             ],
         )
         self.assertEqual(
@@ -98,6 +102,26 @@ class NativeModelRegistryTests(unittest.TestCase):
                     "orbit-qwen38-flash-next-native-v1",
                     "unsloth/Qwen3.8-Flash-Next-GGUF",
                     "Qwen3.8-Flash-Next-UD-IQ1_M-00001-of-00003.gguf",
+                ),
+                (
+                    "orbit-lfm25-native-v1",
+                    "unsloth/LFM2.5-8B-A1B-GGUF",
+                    "LFM2.5-8B-A1B-UD-Q4_K_M.gguf",
+                ),
+                (
+                    "orbit-minicpm5-native-v1",
+                    "bartowski/MiniCPM5-2B-GGUF",
+                    "MiniCPM5-2B-Q4_K_M.gguf",
+                ),
+                (
+                    "orbit-granite42-native-v1",
+                    "ibm-granite/granite-4.2-3b-GGUF",
+                    "granite-4.2-3b-Q4_K_M.gguf",
+                ),
+                (
+                    "orbit-granite42-8b-native-v1",
+                    "ibm-granite/granite-4.2-8b-GGUF",
+                    "granite-4.2-8b-Q4_K_M.gguf",
                 ),
             ],
         )

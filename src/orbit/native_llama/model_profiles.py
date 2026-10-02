@@ -27,6 +27,11 @@ QWEN38_FLASH_NEXT_PROFILE_ID = "orbit-qwen38-flash-next-native-v1"
 QWEN38_FLASH_NEXT_VERIFIED_MODEL_NAME = "Qwen3.8 Flash Next"
 QWEN38_FLASH_NEXT_VERIFIED_FILE_TYPE = "31"
 QWEN38_FLASH_NEXT_VERIFIED_QUANTIZATION = "UD-IQ1_M"
+LFM25_PROFILE_ID = "orbit-lfm25-native-v1"
+LFM25_VERIFIED_MODEL_NAME = "Lfm2.5-8B-A1B"
+LFM25_OFFICIAL_TEMPLATE_SHA256 = "6d65c8804847ad74eea912dd7eca3dc1cf7a457b53a77f47d841a14121910963"
+LFM25_VERIFIED_FILE_TYPE = "15"
+LFM25_VERIFIED_QUANTIZATION = "Q4_K_M"
 # Metadata keys read when identifying a model profile. Every key any pinned
 # identity below compares must appear here: a key absent from this set is read
 # as the empty string, which silently fails the comparison and reports a
@@ -59,6 +64,10 @@ PROFILE_METADATA_KEYS = frozenset(
         "qwen4exp.block_count",
         "qwen4exp.expert_count",
         "qwen4exp.expert_used_count",
+        "lfm2moe.context_length",
+        "lfm2moe.block_count",
+        "lfm2moe.expert_count",
+        "lfm2moe.expert_used_count",
         "llama.context_length",
         "llama.block_count",
         "granite.context_length",
@@ -248,6 +257,7 @@ VERIFIED_NATIVE_MODEL_IDENTITIES = (
     VerifiedNativeModelIdentity(
         QWEN38_FLASH_NEXT_PROFILE_ID, QWEN38_FLASH_NEXT_VERIFIED_MODEL_NAME, "qwen4exp"
     ),
+    VerifiedNativeModelIdentity(LFM25_PROFILE_ID, LFM25_VERIFIED_MODEL_NAME, "lfm2moe"),
     VerifiedNativeModelIdentity(
         QWEN3_CODER_PROFILE_ID,
         QWEN3_CODER_VERIFIED_MODEL_NAME,
@@ -459,6 +469,41 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             # Full sequence state at an unchanged native decode-call boundary.
             # Runtime eligibility additionally pins the qualified configuration.
             route_prefix_reuse_supported=True,
+        )
+
+    lfm25_identity = (
+        architecture == "lfm2moe"
+        and model_name == LFM25_VERIFIED_MODEL_NAME
+        and tokenizer_model == "gpt2"
+        and tokenizer_pre == "lfm2"
+        and file_type == LFM25_VERIFIED_FILE_TYPE
+        and metadata.get("tokenizer.ggml.bos_token_id", "").strip() == "124894"
+        and metadata.get("tokenizer.ggml.eos_token_id", "").strip() == "124900"
+        and metadata.get("tokenizer.ggml.padding_token_id", "").strip() == "124893"
+        and metadata.get("lfm2moe.context_length", "").strip() == "128000"
+        and metadata.get("lfm2moe.block_count", "").strip() == "24"
+        and metadata.get("lfm2moe.expert_count", "").strip() == "32"
+        and metadata.get("lfm2moe.expert_used_count", "").strip() == "4"
+        and template_hash == LFM25_OFFICIAL_TEMPLATE_SHA256
+    )
+    if lfm25_identity:
+        return NativeModelProfile(
+            profile_id=LFM25_PROFILE_ID,
+            family="lfm2.5",
+            model_name=model_name,
+            architecture=architecture,
+            renderer="llama.cpp-jinja",
+            reasoning_protocol="lfm2-think",
+            tool_call_protocol="lfm2-python",
+            history_serialization="orbit-native-roles",
+            verified=True,
+            failure_reason=None,
+            template_source="gguf-embedded-official",
+            template_sha256=template_hash,
+            thinking_supported=True,
+            mtp_supported=False,
+            gemma_prefix_reuse_supported=False,
+            verified_quantization=LFM25_VERIFIED_QUANTIZATION,
         )
 
     qwen3_coder_identity = (
@@ -676,6 +721,16 @@ def _unverified_reason(
         if template_hash != QWEN38_OFFICIAL_TEMPLATE_SHA256:
             return "qwen38_flash_next_template_identity_mismatch"
         return "qwen38_flash_next_metadata_identity_mismatch"
+    if architecture == "lfm2moe":
+        if model_name != LFM25_VERIFIED_MODEL_NAME:
+            return "lfm25_model_identity_mismatch"
+        if tokenizer_model != "gpt2" or tokenizer_pre != "lfm2":
+            return "lfm25_tokenizer_identity_mismatch"
+        if file_type != LFM25_VERIFIED_FILE_TYPE:
+            return "lfm25_quantization_identity_mismatch"
+        if template_hash != LFM25_OFFICIAL_TEMPLATE_SHA256:
+            return "lfm25_template_identity_mismatch"
+        return "lfm25_metadata_identity_mismatch"
     if architecture == "qwen3moe":
         if model_name != QWEN3_CODER_VERIFIED_MODEL_NAME:
             return "qwen3_coder_model_identity_mismatch"

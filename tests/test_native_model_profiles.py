@@ -10,6 +10,7 @@ from orbit.native_llama.model_profiles import (
     GEMMA4_PROFILE_ID,
     GRANITE42_PROFILE_ID,
     GRANITE42_8B_PROFILE_ID,
+    LFM25_PROFILE_ID,
     MINICPM5_PROFILE_ID,
     QWEN36_PROFILE_ID,
     QWEN3_CODER_PROFILE_ID,
@@ -87,6 +88,21 @@ GRANITE42_METADATA = {
 GRANITE42_8B_METADATA = {
     **GRANITE42_METADATA,
     "general.name": "Granite 4.2 8b",
+}
+
+LFM25_METADATA = {
+    "general.architecture": "lfm2moe",
+    "general.name": "Lfm2.5-8B-A1B",
+    "general.file_type": "15",
+    "tokenizer.ggml.model": "gpt2",
+    "tokenizer.ggml.pre": "lfm2",
+    "tokenizer.ggml.bos_token_id": "124894",
+    "tokenizer.ggml.eos_token_id": "124900",
+    "tokenizer.ggml.padding_token_id": "124893",
+    "lfm2moe.context_length": "128000",
+    "lfm2moe.block_count": "24",
+    "lfm2moe.expert_count": "32",
+    "lfm2moe.expert_used_count": "4",
 }
 
 
@@ -190,6 +206,35 @@ class Qwen38ProfileTests(unittest.TestCase):
 
 
 class NativeModelProfileTests(unittest.TestCase):
+    def test_detects_verified_lfm25_only_from_exact_identity(self) -> None:
+        template = "official-lfm25-template"
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        with mock.patch("orbit.native_llama.model_profiles.LFM25_OFFICIAL_TEMPLATE_SHA256", digest):
+            profile = detect_native_model_profile(LFM25_METADATA, template)
+
+        self.assertEqual(profile.profile_id, LFM25_PROFILE_ID)
+        self.assertTrue(profile.verified)
+        self.assertEqual(profile.family, "lfm2.5")
+        self.assertEqual(profile.tool_call_protocol, "lfm2-python")
+        self.assertFalse(profile.route_prefix_reuse_supported)
+        self.assertEqual(profile.verified_quantization, "Q4_K_M")
+
+    def test_lfm25_identity_drift_fails_closed(self) -> None:
+        template = "official-lfm25-template"
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        with mock.patch("orbit.native_llama.model_profiles.LFM25_OFFICIAL_TEMPLATE_SHA256", digest):
+            for key, value in (
+                ("general.name", "Lfm2.5-1B"),
+                ("tokenizer.ggml.pre", "qwen35"),
+                ("general.file_type", "7"),
+                ("lfm2moe.block_count", "23"),
+                ("tokenizer.ggml.eos_token_id", "2"),
+            ):
+                with self.subTest(key=key):
+                    profile = detect_native_model_profile({**LFM25_METADATA, key: value}, template)
+                    self.assertFalse(profile.verified)
+                    self.assertNotEqual(profile.profile_id, LFM25_PROFILE_ID)
+
     def test_detects_verified_granite42_only_from_exact_gguf_identity(self) -> None:
         template = "official-granite42-template"
         digest = hashlib.sha256(template.encode()).hexdigest()

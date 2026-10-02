@@ -1,5 +1,14 @@
 # Orbit
 
+> **Nota sul fork.** Questo fork è uno studio preliminare per affiancare Orbit
+> a strumenti come [llmwiki](https://github.com/KnowledgeGarden/llmwiki), con
+> l'obiettivo di costruire un piccolo *second brain* locale: un ambiente
+> personale, eseguibile offline e basato su modelli locali, capace di
+> organizzare conversazioni, documenti, evidenze e conoscenza operativa. Non è
+> una dichiarazione di produzione o di qualifica semantica generale; le
+> capacità effettive restano limitate ai profili, ai test e alle evidenze
+> riportati in questo README e nella documentazione di qualifica.
+
 Orbit is a Python local-AI runtime for CPU-only machines. It combines local
 chat, model-selected tools, file workflows and static artifact analysis in a
 terminal client. Linux x86_64 is the qualified platform.
@@ -67,6 +76,22 @@ Git metadata and older/external servers report an unknown commit. This is a
 revision diagnostic, not an integrity check of local edits or compatibility
 certification; it never restarts or disconnects a server.
 
+## Recent developments
+
+- **LFM2.5 8B-A1B** is available through the exact verified
+  `LFM2.5-8B-A1B-UD-Q4_K_M.gguf` profile from
+  `unsloth/LFM2.5-8B-A1B-GGUF`.
+- LFM2.5 has a dedicated `lfm2moe` identity and an isolated rolling route-cache
+  identity, so its checkpoints are never shared with Qwen, Ornith or other
+  model families. The cache path is enabled in the runtime, while real-model
+  round-trip qualification is still pending.
+- The model store is configurable across discovery, download and server startup;
+  split GGUF downloads support per-shard validation, resume and atomic
+  publication.
+- Qwen3.8 Flash Next has an exact verified split-GGUF profile, rolling route
+  reuse and aligned startup route prewarm. These optimizations remain
+  model-specific and do not generalize automatically to every local model.
+
 ## Supported models and qualification
 
 The [model registry](src/orbit/native_llama/model_registry.json) contains these
@@ -82,6 +107,7 @@ This list is not a performance ranking.
 | Qwen3-Coder 30B-A3B Instruct | Q4_K_M |
 | Qwen3.8 27B | Q4_K_M |
 | Qwen3.8 Flash Next | UD-IQ1_M, three shards |
+| LFM2.5 8B-A1B | UD-Q4_K_M |
 | Granite 4.2 3B | Q4_K_M, Q8_0 |
 | Granite 4.2 8B | Q4_K_M, Q6_K |
 
@@ -100,6 +126,10 @@ for accurate explanations across the semantic corpus.
 Qwen3.8 Flash Next UD-IQ1_M retains backend/CHAT qualification on the tested
 Dell configuration. It did not pass the retained ANALYSIS semantic cases.
 That result does not extend to every Qwen model or quantization.
+
+LFM2.5 8B-A1B uses a distinct verified profile and rolling route-cache identity;
+its cache round-trip still requires real-model qualification before performance
+or broader workflow claims are made.
 
 See the [qualification scope](docs/ANALYSIS_QUALIFICATION.md) and
 [semantic baseline](docs/ANALYSIS_SEMANTIC_BASELINE.md) for evidence and limits.

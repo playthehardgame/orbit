@@ -38,6 +38,7 @@ if str(SRC) not in sys.path:
 from orbit.native_llama.client import ROLLING_ROUTE_PROFILE_IDS, NativeLlamaClient
 from orbit.native_llama.model_profiles import (
     GEMMA4_PROFILE_ID,
+    LFM25_PROFILE_ID,
     ORNITH15_PROFILE_ID,
     QWEN36_PROFILE_ID,
     QWEN38_FLASH_NEXT_PROFILE_ID,
@@ -187,9 +188,26 @@ class EligibilityTest(unittest.TestCase):
             client._ornith_rolling_route_eligible(route_prefix_anchor=True, tools=None, thinking=False)
         )
 
+    def test_lfm25_route_calls_are_eligible(self) -> None:
+        client, _ = flash_next_client()
+        client.model_profile = _Profile(LFM25_PROFILE_ID)
+        self.assertTrue(
+            client._ornith_rolling_route_eligible(
+                route_prefix_anchor=True, tools=None, thinking=False
+            )
+        )
+
     def test_the_qualified_set_is_exactly_ornith_and_flash_next(self) -> None:
-        self.assertEqual(ROLLING_ROUTE_PROFILE_IDS, {ORNITH15_PROFILE_ID, QWEN38_FLASH_NEXT_PROFILE_ID})
-        for profile_id in (GEMMA4_PROFILE_ID, QWEN36_PROFILE_ID, QWEN38_PROFILE_ID, QWEN3_CODER_PROFILE_ID):
+        self.assertEqual(
+            ROLLING_ROUTE_PROFILE_IDS,
+            {ORNITH15_PROFILE_ID, QWEN38_FLASH_NEXT_PROFILE_ID, LFM25_PROFILE_ID},
+        )
+        for profile_id in (
+            GEMMA4_PROFILE_ID,
+            QWEN36_PROFILE_ID,
+            QWEN38_PROFILE_ID,
+            QWEN3_CODER_PROFILE_ID,
+        ):
             client, _ = flash_next_client()
             client.model_profile = _Profile(profile_id)
             with self.subTest(profile=profile_id):

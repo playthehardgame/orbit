@@ -12,7 +12,7 @@ from unittest import mock
 from orbit.native_llama.client import NativeRoutePrefixPrefillResult
 from orbit.native_llama.model_discovery import ModelDiscoveryResult, ModelDiscoveryRow
 from orbit.native_llama.model_download import DownloadResult
-from orbit.native_llama.model_profiles import QWEN3_CODER_PROFILE_ID
+from orbit.native_llama.model_profiles import LFM25_PROFILE_ID, QWEN3_CODER_PROFILE_ID
 from orbit.native_llama.native_names import runtime_library_filename
 from orbit.native_server.app import (
     PREFIX_PREWARM_OFF,
@@ -22,6 +22,7 @@ from orbit.native_server.app import (
     resolve_bootstrap_paths,
     resolve_model_alias,
     route_prefix_prewarm_mode,
+    _startup_route_prewarm_supported,
     run_server,
     tools_startup_enabled,
 )
@@ -351,6 +352,15 @@ class NativeServerBootstrapTests(unittest.TestCase):
         self.assertTrue(result.succeeded)
         self.assertTrue(result.restore_ready)
         self.assertEqual(client.capture_calls, 1)
+
+    def test_unqualified_rolling_profile_does_not_claim_startup_prewarm(self) -> None:
+        client = _FakeNativeClient()
+        client.model_profile = SimpleNamespace(
+            profile_id=LFM25_PROFILE_ID,
+            gemma_prefix_reuse_supported=False,
+        )
+
+        self.assertFalse(_startup_route_prewarm_supported(client))  # type: ignore[arg-type]
 
     @mock.patch.dict("os.environ", {"ORBIT_KV_PREFIX_PREWARM": "off"}, clear=True)
     def test_startup_prewarm_explicit_off_skips_without_capture(self) -> None:

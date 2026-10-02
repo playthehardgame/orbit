@@ -1537,7 +1537,13 @@ def run_server(argv: list[str] | None = None) -> int:
         # start line is emitted immediately before the expensive call, the
         # outcome only after it returns.
         announce_prewarm = route_prefix_prewarm_mode() == PREFIX_PREWARM_STARTUP
-        if getattr(getattr(client, "model_profile", None), "profile_id", None) not in (
+        if not _startup_route_prewarm_supported(client):
+            # Rolling route-cache profiles may still capture lazily on their
+            # first eligible request, but they do not have a qualified startup
+            # checkpoint. Do not announce a prewarm that can only report
+            # model_profile_ineligible.
+            pass
+        elif getattr(getattr(client, "model_profile", None), "profile_id", None) not in (
             QWEN3_CODER_PROFILE_ID,
             ORNITH15_PROFILE_ID,
             QWEN38_FLASH_NEXT_PROFILE_ID,
@@ -1731,6 +1737,24 @@ def prewarm_startup_route_prefix(client: NativeLlamaClient) -> NativeRoutePrefix
         )
     _emit_startup_prewarm_diag(mode=mode, tools_enabled=tools_enabled, result=result)
     return result
+
+
+def _startup_route_prewarm_supported(client: NativeLlamaClient) -> bool:
+    profile = getattr(client, "model_profile", None)
+    if profile is None:
+        # Preserve the legacy generic path for lightweight clients and older
+        # compatibility backends that do not expose a model profile.
+        return True
+    profile_id = getattr(profile, "profile_id", None)
+    return bool(
+        getattr(profile, "gemma_prefix_reuse_supported", False)
+        or profile_id
+        in (
+            QWEN3_CODER_PROFILE_ID,
+            ORNITH15_PROFILE_ID,
+            QWEN38_FLASH_NEXT_PROFILE_ID,
+        )
+    )
 
 
 def prewarm_startup_analysis_prefix(client: NativeLlamaClient) -> NativeRoutePrefixPrefillResult:

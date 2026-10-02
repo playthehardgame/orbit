@@ -4,7 +4,7 @@
 
 This document describes the controlled runtime integration for native route
 prefix prewarm. It covers the Gemma route anchor and the separately identified
-Qwen3-Coder route checkpoint.
+native checkpoints for Qwen3-Coder, Qwen3.8 Flash Next, and Granite 4.2.
 
 The feature now runs by default when the native server starts with tools enabled.
 It can still be disabled explicitly.
@@ -81,8 +81,9 @@ Because this is synchronous startup work, server readiness is delayed by the
 prewarm duration when the feature is enabled. With the tested Gemma 4 12B CPU
 setup, the prefill-only capture for the 693-token stable route prefix has been
 observed around 49-59 seconds. The verified Qwen3-Coder 30B profile captured its
-768-token checkpoint in 21.62 seconds in production-hook qualification. Timings
-are descriptive.
+768-token checkpoint in 21.62 seconds in production-hook qualification. Granite
+4.2 uses the same profile-specific prefill-only hook; its startup capture is
+enabled only for the verified 3B and 8B profiles. Timings are descriptive.
 
 ## Guardrails
 
@@ -106,9 +107,9 @@ It is skipped when:
 - the prefix-anchor hook reports an ineligible state
 
 Failures are not user-facing. A failed prewarm leaves the server usable; the
-first real route call falls back to the existing baseline/capture path. Qwen3.6
-retains its existing lazy first-route capture and is unchanged by the
-Qwen3-Coder startup integration.
+first real route call falls back to the existing baseline/capture path. Profiles
+without a qualified startup integration retain their existing lazy first-route
+capture.
 
 ## Locking, Cancellation, And Failure
 
@@ -120,7 +121,7 @@ capture methods and their shared lock and validity rules:
 - decode/capture failure clears target memory and invalidates the route anchor
 - cancellation or incomplete prefill returns `restore_ready=false`
 - sampler and session history are not touched
-- an operator SIGINT during Qwen3-Coder prewarm cancels capture and exits before
+- an operator SIGINT during a profile-specific startup prewarm cancels capture and exits before
   the server binds; an ordinary capture failure retains the safe cold fallback
 
 The startup lifecycle runs before serving requests, so there should be no
@@ -176,8 +177,10 @@ Required validation for this integration:
 - hook failure leaves the server usable with `restore_ready=false`
 - Qwen3-Coder startup capture is followed by `cached=768` restore on the first
   real eligible route
+- Qwen3.8 Flash Next and Granite 4.2 startup captures use their own verified
+  route-prefix identities and never share checkpoints across profiles
 - `ORBIT_QWEN3_CODER_ROUTE_PREFIX_REUSE=0` prevents Qwen3-Coder prewarm
-- Qwen3.6 and Gemma checkpoint identities and behavior remain unchanged
+- profiles without startup prewarm retain their existing lazy capture behavior
 - diagnostics stay metadata-only
 - existing read/list/web/fetch behavior is unchanged
 - stale-evidence and listing-to-read guardrails remain intact

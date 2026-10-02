@@ -197,7 +197,7 @@ class EligibilityTest(unittest.TestCase):
             )
         )
 
-    def test_the_qualified_set_is_exactly_ornith_and_flash_next(self) -> None:
+    def test_the_qualified_set_is_exactly_ornith_flash_next_and_lfm25(self) -> None:
         self.assertEqual(
             ROLLING_ROUTE_PROFILE_IDS,
             {ORNITH15_PROFILE_ID, QWEN38_FLASH_NEXT_PROFILE_ID, LFM25_PROFILE_ID},

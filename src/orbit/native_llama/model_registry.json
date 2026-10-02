@@ -99,6 +99,30 @@
       }
     },
     {
+      "id": "lfm25-8b-a1b-q8-0",
+      "display_name": "LFM2.5 8B-A1B Q8_0",
+      "profile_id": "orbit-lfm25-q8-native-v1",
+      "backend": "native-llama",
+      "architecture": "lfm2moe",
+      "target": {
+        "repo": "unsloth/LFM2.5-8B-A1B-GGUF",
+        "file": "LFM2.5-8B-A1B-Q8_0.gguf",
+        "cache_glob": "models--unsloth--LFM2.5-8B-A1B-GGUF/snapshots/*/LFM2.5-8B-A1B-Q8_0.gguf"
+      }
+    },
+    {
+      "id": "lfm25-8b-a1b-ud-q6-k",
+      "display_name": "LFM2.5 8B-A1B UD-Q6_K",
+      "profile_id": "orbit-lfm25-q6-native-v1",
+      "backend": "native-llama",
+      "architecture": "lfm2moe",
+      "target": {
+        "repo": "unsloth/LFM2.5-8B-A1B-GGUF",
+        "file": "LFM2.5-8B-A1B-UD-Q6_K.gguf",
+        "cache_glob": "models--unsloth--LFM2.5-8B-A1B-GGUF/snapshots/*/LFM2.5-8B-A1B-UD-Q6_K.gguf"
+      }
+    },
+    {
       "id": "minicpm5-2b-q4-k-m",
       "display_name": "MiniCPM5 2B",
       "profile_id": "orbit-minicpm5-native-v1",

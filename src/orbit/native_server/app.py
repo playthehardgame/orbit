@@ -1753,6 +1753,8 @@ def _startup_route_prewarm_supported(client: NativeLlamaClient) -> bool:
             QWEN3_CODER_PROFILE_ID,
             ORNITH15_PROFILE_ID,
             QWEN38_FLASH_NEXT_PROFILE_ID,
+            GRANITE42_PROFILE_ID,
+            GRANITE42_8B_PROFILE_ID,
         )
     )
 

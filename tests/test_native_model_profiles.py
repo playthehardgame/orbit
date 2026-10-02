@@ -11,6 +11,8 @@ from orbit.native_llama.model_profiles import (
     GRANITE42_PROFILE_ID,
     GRANITE42_8B_PROFILE_ID,
     LFM25_PROFILE_ID,
+    LFM25_Q6_PROFILE_ID,
+    LFM25_Q8_PROFILE_ID,
     MINICPM5_PROFILE_ID,
     QWEN36_PROFILE_ID,
     QWEN3_CODER_PROFILE_ID,
@@ -219,6 +221,28 @@ class NativeModelProfileTests(unittest.TestCase):
         self.assertFalse(profile.route_prefix_reuse_supported)
         self.assertEqual(profile.verified_quantization, "Q4_K_M")
 
+    def test_detects_verified_lfm25_q8_artifact(self) -> None:
+        template = "official-lfm25-template"
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        metadata = {**LFM25_METADATA, "general.file_type": "7"}
+        with mock.patch("orbit.native_llama.model_profiles.LFM25_OFFICIAL_TEMPLATE_SHA256", digest):
+            profile = detect_native_model_profile(metadata, template)
+
+        self.assertEqual(profile.profile_id, LFM25_Q8_PROFILE_ID)
+        self.assertTrue(profile.verified)
+        self.assertEqual(profile.verified_quantization, "Q8_0")
+
+    def test_detects_verified_lfm25_q6_artifact(self) -> None:
+        template = "official-lfm25-template"
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        metadata = {**LFM25_METADATA, "general.file_type": "18"}
+        with mock.patch("orbit.native_llama.model_profiles.LFM25_OFFICIAL_TEMPLATE_SHA256", digest):
+            profile = detect_native_model_profile(metadata, template)
+
+        self.assertEqual(profile.profile_id, LFM25_Q6_PROFILE_ID)
+        self.assertTrue(profile.verified)
+        self.assertEqual(profile.verified_quantization, "Q6_K")
+
     def test_lfm25_identity_drift_fails_closed(self) -> None:
         template = "official-lfm25-template"
         digest = hashlib.sha256(template.encode()).hexdigest()
@@ -226,7 +250,7 @@ class NativeModelProfileTests(unittest.TestCase):
             for key, value in (
                 ("general.name", "Lfm2.5-1B"),
                 ("tokenizer.ggml.pre", "qwen35"),
-                ("general.file_type", "7"),
+                ("general.file_type", "12"),
                 ("lfm2moe.block_count", "23"),
                 ("tokenizer.ggml.eos_token_id", "2"),
             ):

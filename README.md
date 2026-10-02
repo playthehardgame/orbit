@@ -79,7 +79,8 @@ certification; it never restarts or disconnects a server.
 ## Recent developments
 
 - **LFM2.5 8B-A1B** is available through the exact verified
-  `LFM2.5-8B-A1B-UD-Q4_K_M.gguf` profile from
+  `LFM2.5-8B-A1B-UD-Q4_K_M.gguf`, `LFM2.5-8B-A1B-Q8_0.gguf` and
+  `LFM2.5-8B-A1B-UD-Q6_K.gguf` profiles from
   `unsloth/LFM2.5-8B-A1B-GGUF`.
 - LFM2.5 has a dedicated `lfm2moe` identity and an isolated rolling route-cache
   identity, so its checkpoints are never shared with Qwen, Ornith or other
@@ -108,7 +109,7 @@ This list is not a performance ranking.
 | Qwen3.8 27B | Q4_K_M |
 | MiniCPM5 2B | Q4_K_M |
 | Qwen3.8 Flash Next | UD-IQ1_M, three shards |
-| LFM2.5 8B-A1B | UD-Q4_K_M |
+| LFM2.5 8B-A1B | UD-Q4_K_M, Q8_0, UD-Q6_K |
 | Granite 4.2 3B | Q4_K_M, Q8_0 |
 | Granite 4.2 8B | Q4_K_M, Q6_K |
 

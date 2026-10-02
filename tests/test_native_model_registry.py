@@ -65,6 +65,8 @@ class NativeModelRegistryTests(unittest.TestCase):
                 ("Qwen3-Coder 30B-A3B", "orbit-qwen3-coder-native-v1"),
                 ("Qwen 3.8 Flash Next", "orbit-qwen38-flash-next-native-v1"),
                 ("LFM2.5 8B-A1B", "orbit-lfm25-native-v1"),
+                ("LFM2.5 8B-A1B Q8_0", "orbit-lfm25-q8-native-v1"),
+                ("LFM2.5 8B-A1B UD-Q6_K", "orbit-lfm25-q6-native-v1"),
                 ("MiniCPM5 2B", "orbit-minicpm5-native-v1"),
                 ("Granite 4.2 3B", "orbit-granite42-native-v1"),
                 ("Granite 4.2 8B", "orbit-granite42-8b-native-v1"),
@@ -107,6 +109,16 @@ class NativeModelRegistryTests(unittest.TestCase):
                     "orbit-lfm25-native-v1",
                     "unsloth/LFM2.5-8B-A1B-GGUF",
                     "LFM2.5-8B-A1B-UD-Q4_K_M.gguf",
+                ),
+                (
+                    "orbit-lfm25-q8-native-v1",
+                    "unsloth/LFM2.5-8B-A1B-GGUF",
+                    "LFM2.5-8B-A1B-Q8_0.gguf",
+                ),
+                (
+                    "orbit-lfm25-q6-native-v1",
+                    "unsloth/LFM2.5-8B-A1B-GGUF",
+                    "LFM2.5-8B-A1B-UD-Q6_K.gguf",
                 ),
                 (
                     "orbit-minicpm5-native-v1",

@@ -28,10 +28,17 @@ QWEN38_FLASH_NEXT_VERIFIED_MODEL_NAME = "Qwen3.8 Flash Next"
 QWEN38_FLASH_NEXT_VERIFIED_FILE_TYPE = "31"
 QWEN38_FLASH_NEXT_VERIFIED_QUANTIZATION = "UD-IQ1_M"
 LFM25_PROFILE_ID = "orbit-lfm25-native-v1"
+LFM25_Q8_PROFILE_ID = "orbit-lfm25-q8-native-v1"
+LFM25_Q6_PROFILE_ID = "orbit-lfm25-q6-native-v1"
 LFM25_VERIFIED_MODEL_NAME = "Lfm2.5-8B-A1B"
 LFM25_OFFICIAL_TEMPLATE_SHA256 = "6d65c8804847ad74eea912dd7eca3dc1cf7a457b53a77f47d841a14121910963"
 LFM25_VERIFIED_FILE_TYPE = "15"
 LFM25_VERIFIED_QUANTIZATION = "Q4_K_M"
+LFM25_VERIFIED_FILE_TYPES = {
+    "15": "Q4_K_M",
+    "7": "Q8_0",
+    "18": "Q6_K",
+}
 # Metadata keys read when identifying a model profile. Every key any pinned
 # identity below compares must appear here: a key absent from this set is read
 # as the empty string, which silently fails the comparison and reports a
@@ -258,6 +265,8 @@ VERIFIED_NATIVE_MODEL_IDENTITIES = (
         QWEN38_FLASH_NEXT_PROFILE_ID, QWEN38_FLASH_NEXT_VERIFIED_MODEL_NAME, "qwen4exp"
     ),
     VerifiedNativeModelIdentity(LFM25_PROFILE_ID, LFM25_VERIFIED_MODEL_NAME, "lfm2moe"),
+    VerifiedNativeModelIdentity(LFM25_Q8_PROFILE_ID, LFM25_VERIFIED_MODEL_NAME, "lfm2moe"),
+    VerifiedNativeModelIdentity(LFM25_Q6_PROFILE_ID, LFM25_VERIFIED_MODEL_NAME, "lfm2moe"),
     VerifiedNativeModelIdentity(
         QWEN3_CODER_PROFILE_ID,
         QWEN3_CODER_VERIFIED_MODEL_NAME,
@@ -476,7 +485,7 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
         and model_name == LFM25_VERIFIED_MODEL_NAME
         and tokenizer_model == "gpt2"
         and tokenizer_pre == "lfm2"
-        and file_type == LFM25_VERIFIED_FILE_TYPE
+        and file_type in LFM25_VERIFIED_FILE_TYPES
         and metadata.get("tokenizer.ggml.bos_token_id", "").strip() == "124894"
         and metadata.get("tokenizer.ggml.eos_token_id", "").strip() == "124900"
         and metadata.get("tokenizer.ggml.padding_token_id", "").strip() == "124893"
@@ -488,7 +497,10 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
     )
     if lfm25_identity:
         return NativeModelProfile(
-            profile_id=LFM25_PROFILE_ID,
+            profile_id={
+                "7": LFM25_Q8_PROFILE_ID,
+                "18": LFM25_Q6_PROFILE_ID,
+            }.get(file_type, LFM25_PROFILE_ID),
             family="lfm2.5",
             model_name=model_name,
             architecture=architecture,
@@ -503,7 +515,7 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             thinking_supported=True,
             mtp_supported=False,
             gemma_prefix_reuse_supported=False,
-            verified_quantization=LFM25_VERIFIED_QUANTIZATION,
+            verified_quantization=LFM25_VERIFIED_FILE_TYPES[file_type],
         )
 
     qwen3_coder_identity = (
@@ -726,7 +738,7 @@ def _unverified_reason(
             return "lfm25_model_identity_mismatch"
         if tokenizer_model != "gpt2" or tokenizer_pre != "lfm2":
             return "lfm25_tokenizer_identity_mismatch"
-        if file_type != LFM25_VERIFIED_FILE_TYPE:
+        if file_type not in LFM25_VERIFIED_FILE_TYPES:
             return "lfm25_quantization_identity_mismatch"
         if template_hash != LFM25_OFFICIAL_TEMPLATE_SHA256:
             return "lfm25_template_identity_mismatch"

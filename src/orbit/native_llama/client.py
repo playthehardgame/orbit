@@ -46,6 +46,8 @@ from .model_profiles import (
     GRANITE42_8B_PROFILE_ID,
     GRANITE42_PROFILE_ID,
     granite42_quantization_for_file_type,
+    LFM25_Q6_PROFILE_ID,
+    LFM25_Q8_PROFILE_ID,
     LFM25_PROFILE_ID,
     MINICPM5_PROFILE_ID,
     ORNITH15_PROFILE_ID,
@@ -162,7 +164,11 @@ from .session_state import DEFAULT_NATIVE_SESSION_ID, NativeSessionSnapshot, Nat
 # a qualification decision: the state round-trip has to be demonstrated on the
 # real model. The ANALYSIS rolling lineage stays Ornith-only.
 ROLLING_ROUTE_PROFILE_IDS = frozenset(
-    {ORNITH15_PROFILE_ID, QWEN38_FLASH_NEXT_PROFILE_ID, LFM25_PROFILE_ID}
+    {
+        ORNITH15_PROFILE_ID,
+        QWEN38_FLASH_NEXT_PROFILE_ID,
+        LFM25_PROFILE_ID,
+    }
 )
 # The profiles whose route checkpoint is advanced past the committed reply
 # after a final call (QWEN38-POST-FINAL-ROUTE-CACHE-23). A subset of the
@@ -3794,7 +3800,7 @@ class NativeLlamaClient:
             format_version = GRANITE42_ROUTE_PREFIX_FORMAT_VERSION
             tokenizer_identity = GRANITE42_ROUTE_TOKENIZER_IDENTITY
             tools_mode = "granite42-route-tools-on-thinking-off"
-        elif profile_id == LFM25_PROFILE_ID:
+        elif profile_id in (LFM25_PROFILE_ID, LFM25_Q8_PROFILE_ID, LFM25_Q6_PROFILE_ID):
             format_version = LFM25_ROUTE_PREFIX_FORMAT_VERSION
             tokenizer_identity = LFM25_ROUTE_TOKENIZER_IDENTITY
             tools_mode = "lfm25-route-tools-on-thinking-off"

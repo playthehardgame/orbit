@@ -12,7 +12,12 @@ from unittest import mock
 from orbit.native_llama.client import NativeRoutePrefixPrefillResult
 from orbit.native_llama.model_discovery import ModelDiscoveryResult, ModelDiscoveryRow
 from orbit.native_llama.model_download import DownloadResult
-from orbit.native_llama.model_profiles import LFM25_PROFILE_ID, QWEN3_CODER_PROFILE_ID
+from orbit.native_llama.model_profiles import (
+    GRANITE42_8B_PROFILE_ID,
+    GRANITE42_PROFILE_ID,
+    LFM25_PROFILE_ID,
+    QWEN3_CODER_PROFILE_ID,
+)
 from orbit.native_llama.native_names import runtime_library_filename
 from orbit.native_server.app import (
     PREFIX_PREWARM_OFF,
@@ -410,6 +415,27 @@ class NativeServerBootstrapTests(unittest.TestCase):
         self.assertEqual(result.prefix_token_count, 768)
         self.assertEqual(client.qwen3_coder_capture_calls, 1)
         self.assertEqual(client.capture_calls, 0)
+
+    def test_startup_prewarm_granite_invokes_profile_hook(self) -> None:
+        for profile_id in (GRANITE42_PROFILE_ID, GRANITE42_8B_PROFILE_ID):
+            with self.subTest(profile_id=profile_id):
+                client = _FakeNativeClient()
+                client.config = SimpleNamespace(
+                    qwen_route_prefix_reuse_enabled=True,
+                    qwen3_coder_route_prefix_reuse_enabled=True,
+                )
+                client.model_profile = SimpleNamespace(
+                    profile_id=profile_id,
+                    gemma_prefix_reuse_supported=False,
+                )
+
+                self.assertTrue(_startup_route_prewarm_supported(client))  # type: ignore[arg-type]
+                result = prewarm_startup_route_prefix(client)  # type: ignore[arg-type]
+
+                self.assertTrue(result.succeeded)
+                self.assertTrue(result.restore_ready)
+                self.assertEqual(client.qwen3_coder_capture_calls, 1)
+                self.assertEqual(client.capture_calls, 0)
 
     @mock.patch.dict("os.environ", {"ORBIT_KV_PREFIX_PREWARM": "off"}, clear=True)
     def test_startup_prewarm_off_leaves_qwen3_coder_lazy_reuse_untouched(self) -> None:

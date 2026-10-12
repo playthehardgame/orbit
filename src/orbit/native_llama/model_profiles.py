@@ -23,6 +23,11 @@ QWEN38_SALUKI_VERIFIED_MODEL_NAME = "Qwen3.8-27B GSQ-RCO"
 QWEN38_SALUKI_OFFICIAL_TEMPLATE_SHA256 = "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041"
 QWEN38_SALUKI_VERIFIED_FILE_TYPE = "20"
 QWEN38_SALUKI_VERIFIED_QUANTIZATION = "IQ2_XS"
+QWEN38_9B_DISTILL_PROFILE_ID = "orbit-qwen38-9b-distill-native-v1"
+QWEN38_9B_DISTILL_VERIFIED_MODEL_NAME = "Qwen3.8 9B"
+QWEN38_9B_DISTILL_OFFICIAL_TEMPLATE_SHA256 = "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715"
+QWEN38_9B_DISTILL_VERIFIED_FILE_TYPE = "15"
+QWEN38_9B_DISTILL_VERIFIED_QUANTIZATION = "Q4_K_M"
 # Qwen3.8 Flash Next: the `qwen4exp` MoE preview (48 blocks, 512 experts, 10
 # used). Exactly one artifact is qualified for production, Unsloth UD-IQ1_M
 # (general.file_type 31 = LLAMA_FTYPE_MOSTLY_IQ1_M), by
@@ -270,6 +275,9 @@ VERIFIED_NATIVE_MODEL_IDENTITIES = (
         QWEN38_SALUKI_PROFILE_ID, QWEN38_SALUKI_VERIFIED_MODEL_NAME, "qwen35"
     ),
     VerifiedNativeModelIdentity(
+        QWEN38_9B_DISTILL_PROFILE_ID, QWEN38_9B_DISTILL_VERIFIED_MODEL_NAME, "qwen35"
+    ),
+    VerifiedNativeModelIdentity(
         QWEN38_FLASH_NEXT_PROFILE_ID, QWEN38_FLASH_NEXT_VERIFIED_MODEL_NAME, "qwen4exp"
     ),
     VerifiedNativeModelIdentity(LFM25_PROFILE_ID, LFM25_VERIFIED_MODEL_NAME, "lfm2moe"),
@@ -480,6 +488,40 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             mtp_supported=False,
             gemma_prefix_reuse_supported=False,
             verified_quantization=QWEN38_SALUKI_VERIFIED_QUANTIZATION,
+            route_prefix_reuse_supported=False,
+        )
+
+    qwen38_9b_distill_identity = (
+        architecture == "qwen35"
+        and model_name == QWEN38_9B_DISTILL_VERIFIED_MODEL_NAME
+        and tokenizer_model == "gpt2"
+        and tokenizer_pre == "qwen35"
+        and file_type == QWEN38_9B_DISTILL_VERIFIED_FILE_TYPE
+        and metadata.get("tokenizer.ggml.eos_token_id", "").strip() == "248046"
+        and metadata.get("tokenizer.ggml.padding_token_id", "").strip() == "248044"
+        and metadata.get("tokenizer.ggml.add_bos_token", "").strip().lower() == "false"
+        and metadata.get("qwen35.context_length", "").strip() == "262144"
+        and metadata.get("qwen35.block_count", "").strip() == "33"
+        and template_hash == QWEN38_9B_DISTILL_OFFICIAL_TEMPLATE_SHA256
+    )
+    if qwen38_9b_distill_identity:
+        return NativeModelProfile(
+            profile_id=QWEN38_9B_DISTILL_PROFILE_ID,
+            family="qwen3.8-9b-distill",
+            model_name=model_name,
+            architecture=architecture,
+            renderer="llama.cpp-jinja",
+            reasoning_protocol="qwen-think",
+            tool_call_protocol="qwen3.6-xml",
+            history_serialization="qwen-leading-system-only",
+            verified=True,
+            failure_reason=None,
+            template_source="gguf-embedded-reviewed",
+            template_sha256=template_hash,
+            thinking_supported=True,
+            mtp_supported=False,
+            gemma_prefix_reuse_supported=False,
+            verified_quantization=QWEN38_9B_DISTILL_VERIFIED_QUANTIZATION,
             route_prefix_reuse_supported=False,
         )
 
@@ -763,6 +805,14 @@ def _unverified_reason(
             if template_hash != QWEN38_SALUKI_OFFICIAL_TEMPLATE_SHA256:
                 return "qwen38_saluki_template_identity_mismatch"
             return "qwen38_saluki_metadata_identity_mismatch"
+        if model_name == QWEN38_9B_DISTILL_VERIFIED_MODEL_NAME:
+            if tokenizer_model != "gpt2" or tokenizer_pre != "qwen35":
+                return "qwen38_9b_distill_tokenizer_identity_mismatch"
+            if file_type != QWEN38_9B_DISTILL_VERIFIED_FILE_TYPE:
+                return "qwen38_9b_distill_quantization_identity_mismatch"
+            if template_hash != QWEN38_9B_DISTILL_OFFICIAL_TEMPLATE_SHA256:
+                return "qwen38_9b_distill_template_identity_mismatch"
+            return "qwen38_9b_distill_metadata_identity_mismatch"
         if model_name != QWEN38_VERIFIED_MODEL_NAME:
             return "qwen38_model_identity_mismatch"
         if tokenizer_model != "gpt2" or tokenizer_pre != "qwen35":

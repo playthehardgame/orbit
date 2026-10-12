@@ -169,6 +169,18 @@
         "file": "Underdog-Saluki-27B-1.0-IQ2-mix.gguf",
         "cache_glob": "models--ConwayResearch--Underdog-Saluki-27B-1.0/snapshots/*/Underdog-Saluki-27B-1.0-IQ2-mix.gguf"
       }
+    },
+    {
+      "id": "qwen38-9b-distill-q4-k-m",
+      "display_name": "Qwen3.8 9B Distill",
+      "profile_id": "orbit-qwen38-9b-distill-native-v1",
+      "backend": "native-llama",
+      "architecture": "qwen35",
+      "target": {
+        "repo": "empero-ai/Qwen3.8-9B-Distill-GGUF",
+        "file": "Qwen3.8-9B-Q4_K_M.gguf",
+        "cache_glob": "models--empero-ai--Qwen3.8-9B-Distill-GGUF/snapshots/*/Qwen3.8-9B-Q4_K_M.gguf"
+      }
     }
   ]
 }

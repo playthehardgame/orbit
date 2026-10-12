@@ -46,7 +46,7 @@ class NativeModelDiscoveryTests(unittest.TestCase):
                 inspector=lambda _path: self.fail("no file should be inspected"),
             )
 
-        self.assertEqual(len(result.rows), 13)
+        self.assertEqual(len(result.rows), 14)
         self.assertTrue(all(row.local == "MISSING" for row in result.rows))
         self.assertTrue(all(row.support == "VERIFIED" for row in result.rows))
         self.assertEqual(
@@ -57,6 +57,7 @@ class NativeModelDiscoveryTests(unittest.TestCase):
                 "orbit download ornith-ai/Ornith-1.5-35B-A3B-GGUF/Ornith-1.5-35B-Q4_K_M.gguf",
                 "orbit download unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-Q4_K_M.gguf",
                 "orbit download ConwayResearch/Underdog-Saluki-27B-1.0/Underdog-Saluki-27B-1.0-IQ2-mix.gguf",
+                "orbit download empero-ai/Qwen3.8-9B-Distill-GGUF/Qwen3.8-9B-Q4_K_M.gguf",
                 "orbit download unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf",
                 "orbit download unsloth/Qwen3.8-Flash-Next-GGUF/Qwen3.8-Flash-Next-UD-IQ1_M-00001-of-00003.gguf",
                 "orbit download unsloth/LFM2.5-8B-A1B-GGUF/LFM2.5-8B-A1B-UD-Q4_K_M.gguf",
@@ -246,7 +247,7 @@ class NativeModelDiscoveryTests(unittest.TestCase):
 
         self.assertEqual(result.metadata_inspections, 1)
         self.assertFalse(any(row.model == "other.gguf" for row in result.rows))
-        self.assertEqual(result.filesystem_scans, 15)
+        self.assertEqual(result.filesystem_scans, 16)
 
     def test_symlink_escape_is_not_inspected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

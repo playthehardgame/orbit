@@ -71,6 +71,7 @@ class NativeModelRegistryTests(unittest.TestCase):
                 ("Granite 4.2 3B", "orbit-granite42-native-v1"),
                 ("Granite 4.2 8B", "orbit-granite42-8b-native-v1"),
                 ("Underdog Saluki 27B 1.0", "orbit-qwen38-saluki-native-v1"),
+                ("Qwen3.8 9B Distill", "orbit-qwen38-9b-distill-native-v1"),
             ],
         )
         self.assertEqual(
@@ -140,6 +141,11 @@ class NativeModelRegistryTests(unittest.TestCase):
                     "orbit-qwen38-saluki-native-v1",
                     "ConwayResearch/Underdog-Saluki-27B-1.0",
                     "Underdog-Saluki-27B-1.0-IQ2-mix.gguf",
+                ),
+                (
+                    "orbit-qwen38-9b-distill-native-v1",
+                    "empero-ai/Qwen3.8-9B-Distill-GGUF",
+                    "Qwen3.8-9B-Q4_K_M.gguf",
                 ),
             ],
         )

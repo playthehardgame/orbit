@@ -17,6 +17,7 @@ from orbit.native_llama.model_profiles import (
     QWEN36_PROFILE_ID,
     QWEN3_CODER_PROFILE_ID,
     QWEN38_PROFILE_ID,
+    QWEN38_9B_DISTILL_PROFILE_ID,
     QWEN38_SALUKI_PROFILE_ID,
     QWEN38_SALUKI_OFFICIAL_TEMPLATE_SHA256,
     NativeModelProfile,
@@ -74,6 +75,19 @@ QWEN38_SALUKI_METADATA = {
     "tokenizer.ggml.add_bos_token": "false",
     "qwen35.context_length": "262144",
     "qwen35.block_count": "64",
+}
+
+QWEN38_9B_DISTILL_METADATA = {
+    "general.architecture": "qwen35",
+    "general.name": "Qwen3.8 9B",
+    "general.file_type": "15",
+    "tokenizer.ggml.model": "gpt2",
+    "tokenizer.ggml.pre": "qwen35",
+    "tokenizer.ggml.eos_token_id": "248046",
+    "tokenizer.ggml.padding_token_id": "248044",
+    "tokenizer.ggml.add_bos_token": "false",
+    "qwen35.context_length": "262144",
+    "qwen35.block_count": "33",
 }
 
 MINICPM5_METADATA = {
@@ -289,6 +303,43 @@ class Qwen38SalukiProfileTests(unittest.TestCase):
             with self.subTest(key=key):
                 profile = self._detect({**QWEN38_SALUKI_METADATA, key: value})
                 self.assertEqual(profile.failure_reason, reason)
+
+
+class Qwen38NineBDistillProfileTests(unittest.TestCase):
+    TEMPLATE = "official-9b-distill-template"
+
+    def _detect(self, metadata=None, template=None):
+        digest = hashlib.sha256(self.TEMPLATE.encode()).hexdigest()
+        with mock.patch(
+            "orbit.native_llama.model_profiles.QWEN38_9B_DISTILL_OFFICIAL_TEMPLATE_SHA256",
+            digest,
+        ):
+            return detect_native_model_profile(
+                metadata or QWEN38_9B_DISTILL_METADATA, template or self.TEMPLATE
+            )
+
+    def test_exact_identity_is_verified_and_isolated(self) -> None:
+        profile = self._detect()
+        self.assertEqual(profile.profile_id, QWEN38_9B_DISTILL_PROFILE_ID)
+        self.assertTrue(profile.verified)
+        self.assertEqual(profile.verified_quantization, "Q4_K_M")
+        self.assertEqual(profile.tool_call_protocol, "qwen3.6-xml")
+        self.assertFalse(profile.route_prefix_reuse_supported)
+        self.assertFalse(profile.mtp_supported)
+
+    def test_drift_fails_closed_with_specific_reasons(self) -> None:
+        for key, value, reason in (
+            ("tokenizer.ggml.pre", "qwen2", "qwen38_9b_distill_tokenizer_identity_mismatch"),
+            ("general.file_type", "17", "qwen38_9b_distill_quantization_identity_mismatch"),
+            ("qwen35.block_count", "32", "qwen38_9b_distill_metadata_identity_mismatch"),
+            ("tokenizer.ggml.eos_token_id", "1", "qwen38_9b_distill_metadata_identity_mismatch"),
+        ):
+            with self.subTest(key=key):
+                profile = self._detect({**QWEN38_9B_DISTILL_METADATA, key: value})
+                self.assertFalse(profile.verified)
+                self.assertEqual(profile.failure_reason, reason)
+        profile = self._detect(template="drifted")
+        self.assertEqual(profile.failure_reason, "qwen38_9b_distill_template_identity_mismatch")
 
 
 class NativeModelProfileTests(unittest.TestCase):

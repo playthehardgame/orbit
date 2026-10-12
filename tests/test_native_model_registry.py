@@ -70,6 +70,7 @@ class NativeModelRegistryTests(unittest.TestCase):
                 ("MiniCPM5 2B", "orbit-minicpm5-native-v1"),
                 ("Granite 4.2 3B", "orbit-granite42-native-v1"),
                 ("Granite 4.2 8B", "orbit-granite42-8b-native-v1"),
+                ("Underdog Saluki 27B 1.0", "orbit-qwen38-saluki-native-v1"),
             ],
         )
         self.assertEqual(
@@ -134,6 +135,11 @@ class NativeModelRegistryTests(unittest.TestCase):
                     "orbit-granite42-8b-native-v1",
                     "ibm-granite/granite-4.2-8b-GGUF",
                     "granite-4.2-8b-Q4_K_M.gguf",
+                ),
+                (
+                    "orbit-qwen38-saluki-native-v1",
+                    "ConwayResearch/Underdog-Saluki-27B-1.0",
+                    "Underdog-Saluki-27B-1.0-IQ2-mix.gguf",
                 ),
             ],
         )

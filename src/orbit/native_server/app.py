@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
+import math
 import os
 import select
 import signal
@@ -107,6 +108,16 @@ PREFIX_PREWARM_ENV = "ORBIT_KV_PREFIX_PREWARM"
 PREFIX_PREWARM_OFF = "off"
 PREFIX_PREWARM_STARTUP = "startup"
 TOOLS_ENV = "ORBIT_TOOLS"
+
+
+def _temperature_arg(value: str) -> float:
+    try:
+        temperature = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("temperature must be a non-negative number") from exc
+    if not math.isfinite(temperature) or temperature < 0.0:
+        raise argparse.ArgumentTypeError("temperature must be a non-negative number")
+    return temperature
 
 
 def _progress_payload(progress: Any, *, session_id: str) -> dict[str, Any]:
@@ -470,6 +481,7 @@ class OrbitNativeServer:
             "ubatch_size": self.client.config.ubatch_size,
             "parallel_slots": 1,
             "thinking_mode": "on" if self.client.config.thinking else "off",
+            "temperature": self.client.config.temperature,
         }
 
     def count_text_tokens(self, text: str) -> dict[str, int]:
@@ -1284,6 +1296,7 @@ def _show_profile(args) -> int:
     if qualified is not None:
         print(f"qualified profile: {qualified.source}")
     print(f"ctx: {ctx_tokens} ({ctx_source})")
+    print(f"temperature: {getattr(args, 'temperature', 0.0)}")
     for line in render_profile_lines(preview):
         print(line)
     if missing:
@@ -1332,7 +1345,11 @@ def _report_startup_prewarm(label: str, result: "NativeRoutePrefixPrefillResult"
 
 
 def run_server(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.temperature > 0.0 and args.enable_mtp_experimental:
+        # The MTP accept loop verifies drafts against the greedy target token.
+        parser.error("--temperature > 0 is not supported with --mtp")
     if getattr(args, "show_profile", False):
         # Preview only, and model-aware: it resolves the model the same way a
         # real start would (explicit path/id, the shared interactive selection,
@@ -1411,6 +1428,7 @@ def run_server(argv: list[str] | None = None) -> int:
                 batch_size=profile.batch,
                 ubatch_size=profile.ubatch,
                 thinking=args.think == "on",
+                temperature=getattr(args, "temperature", 0.0),
                 mtp_probe_enabled=args.enable_mtp_probe,
                 mtp_dry_run_enabled=args.enable_mtp_dry_run,
                 mtp_accept_probe_enabled=args.enable_mtp_accept_probe,
@@ -1919,6 +1937,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Discard any cached auto-calibrated profile and measure this machine again.",
     )
     parser.add_argument("--think", choices=("off", "on"), default="off", help="Default thinking visibility for native server requests.")
+    parser.add_argument(
+        "--temperature",
+        type=_temperature_arg,
+        default=0.0,
+        help="Server-wide sampling temperature for the default native sampler (0 keeps greedy decoding). It overrides any per-request temperature; grammar-constrained calls stay greedy.",
+    )
     parser.add_argument("--repack", choices=("on", "off", "auto"), default="auto", help="CPU weight repacking (llama.cpp use_extra_bufts). 'on'/'off' force it; 'auto' (default) uses the qualified per-machine+model default, else the backend default.")
     parser.add_argument("--enable-mtp-probe", action="store_true", help="Backend-only MTP load/init probe. No generation.")
     parser.add_argument("--enable-mtp-dry-run", action="store_true", help="Backend-only MTP draft generation dry run. No accept loop or user output.")

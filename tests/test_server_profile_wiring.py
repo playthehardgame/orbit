@@ -64,6 +64,23 @@ class ParserDefaultTests(unittest.TestCase):
         self.assertEqual(app_module._resolve_ctx(self.parse([]), None), (app_module.DEFAULT_CTX_TOKENS, "default"))
         self.assertEqual(app_module.DEFAULT_CTX_TOKENS, 8192)
 
+    def test_temperature_defaults_to_greedy_and_accepts_non_negative_values(self) -> None:
+        self.assertEqual(self.parse([]).temperature, 0.0)
+        self.assertEqual(self.parse(["--temperature", "0.7"]).temperature, 0.7)
+        for bad in ("-0.1", "nan", "inf", "warm"):
+            with self.subTest(value=bad), contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit):
+                    self.parse(["--temperature", bad])
+
+    def test_positive_temperature_is_rejected_with_mtp(self) -> None:
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            app_module.run_server(["--temperature", "0.7", "--mtp"])
+
+    def test_zero_temperature_is_accepted_with_mtp(self) -> None:
+        args = self.parse(["--temperature", "0", "--mtp"])
+        self.assertEqual(args.temperature, 0.0)
+        self.assertTrue(args.enable_mtp_experimental)
+
     def test_the_new_flags_exist_and_default_off(self) -> None:
         args = self.parse([])
         self.assertFalse(args.show_profile)

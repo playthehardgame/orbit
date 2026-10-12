@@ -53,6 +53,8 @@ def _stub_library() -> SimpleNamespace:
         "llama_get_logits_ith",
         "llama_sampler_chain_init",
         "llama_sampler_chain_add",
+        "llama_sampler_init_temp",
+        "llama_sampler_init_dist",
         "llama_sampler_init_greedy",
         "llama_sampler_init_grammar",
         "llama_sampler_sample",

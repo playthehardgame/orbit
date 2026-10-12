@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import hashlib
 import unittest
 from pathlib import Path
 from unittest import mock
 
-from orbit.native_llama.client import NativeClientConfig, NativeLlamaClient
+from orbit.native_llama.client import (
+    LLAMA_DEFAULT_SEED,
+    NativeClientConfig,
+    NativeLlamaClient,
+    _add_default_sampler_stages,
+    _canonical_sampler_hash,
+)
 from orbit.native_llama.paths import NativeLlamaPaths
 from orbit.native_server.app import OrbitNativeServer
 
@@ -35,6 +42,7 @@ class NativeRuntimePropsTests(unittest.TestCase):
                 threads_batch=6,
                 batch_size=256,
                 ubatch_size=128,
+                temperature=0.7,
             ),
         )
         server = OrbitNativeServer(client=client, model_alias="m")
@@ -48,6 +56,7 @@ class NativeRuntimePropsTests(unittest.TestCase):
         self.assertEqual(runtime["ubatch_size"], 128)
         self.assertEqual(runtime["parallel_slots"], 1)
         self.assertEqual(runtime["thinking_mode"], "off")
+        self.assertEqual(runtime["temperature"], 0.7)
 
     @mock.patch("orbit.native_llama.client.LlamaLibrary")
     def test_server_props_include_multimodal_paths(self, _mocked_lib) -> None:
@@ -123,6 +132,52 @@ class NativeRuntimePropsTests(unittest.TestCase):
 
         self.assertEqual(server.native_backend_capabilities["status"], "verified")
         build_manifest.assert_called_once_with(client, final_system_prompt=mock.ANY)
+
+
+class DefaultSamplerStagesTests(unittest.TestCase):
+    def test_zero_temperature_keeps_the_greedy_chain(self) -> None:
+        lib = mock.Mock()
+        lib.llama_sampler_init_greedy.return_value = 11
+        _add_default_sampler_stages(lib, 7, 0.0)
+        lib.llama_sampler_chain_add.assert_called_once_with(7, 11)
+        lib.llama_sampler_init_temp.assert_not_called()
+        lib.llama_sampler_init_dist.assert_not_called()
+
+    def test_positive_temperature_adds_a_selecting_dist_stage(self) -> None:
+        lib = mock.Mock()
+        lib.llama_sampler_init_temp.return_value = 21
+        lib.llama_sampler_init_dist.return_value = 22
+        _add_default_sampler_stages(lib, 7, 0.7)
+        lib.llama_sampler_init_temp.assert_called_once_with(0.7)
+        lib.llama_sampler_init_dist.assert_called_once_with(LLAMA_DEFAULT_SEED)
+        lib.llama_sampler_chain_add.assert_has_calls([mock.call(7, 21), mock.call(7, 22)])
+        lib.llama_sampler_init_greedy.assert_not_called()
+
+    def test_missing_stage_fails_loudly_without_a_half_built_chain(self) -> None:
+        lib = mock.Mock()
+        lib.llama_sampler_init_temp.return_value = 21
+        lib.llama_sampler_init_dist.return_value = None
+        with self.assertRaises(RuntimeError):
+            _add_default_sampler_stages(lib, 7, 0.7)
+        lib.llama_sampler_chain_add.assert_not_called()
+        lib.llama_sampler_free.assert_called_once_with(21)
+
+    @mock.patch("orbit.native_llama.client.LlamaLibrary")
+    def test_client_rejects_positive_temperature_with_mtp(self, _mocked_lib) -> None:
+        with self.assertRaises(ValueError):
+            NativeLlamaClient(
+                NativeRuntimePropsTests._paths(None),
+                NativeClientConfig(temperature=0.7, use_mtp_experimental=True),
+            )
+
+    def test_greedy_sampler_hash_is_unchanged(self) -> None:
+        self.assertEqual(
+            _canonical_sampler_hash(0.0),
+            hashlib.sha256(
+                b'{"min_p":0.0,"repeat_penalty":1.0,"sampler":"greedy","temperature":0.0,"top_k":1,"top_p":1.0}'
+            ).hexdigest()[:16],
+        )
+        self.assertNotEqual(_canonical_sampler_hash(0.7), _canonical_sampler_hash(0.0))
 
 
 if __name__ == "__main__":

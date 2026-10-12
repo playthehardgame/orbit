@@ -54,6 +54,7 @@ from .model_profiles import (
     PROFILE_METADATA_KEYS,
     QWEN36_PROFILE_ID,
     QWEN38_FLASH_NEXT_PROFILE_ID,
+    QWEN38_SALUKI_PROFILE_ID,
     QWEN3_CODER_PROFILE_ID,
     SELF_MTP_CAPABILITY,
     NativeModelProfile,
@@ -158,6 +159,9 @@ from .persistent_mtp import (
 )
 from .session_state import DEFAULT_NATIVE_SESSION_ID, NativeSessionSnapshot, NativeSessionState
 
+# llama.h LLAMA_DEFAULT_SEED: the dist sampler draws a random seed.
+LLAMA_DEFAULT_SEED = 0xFFFFFFFF
+
 # Profiles whose CHAT route calls may use the rolling route checkpoint (the
 # conversation's own route prompt, captured at the prefill boundary and
 # restored on the next route call under the exact-prefix rule). Membership is
@@ -168,6 +172,7 @@ ROLLING_ROUTE_PROFILE_IDS = frozenset(
         ORNITH15_PROFILE_ID,
         QWEN38_FLASH_NEXT_PROFILE_ID,
         LFM25_PROFILE_ID,
+        QWEN38_SALUKI_PROFILE_ID,
     }
 )
 # The profiles whose route checkpoint is advanced past the committed reply
@@ -217,6 +222,7 @@ class NativeClientConfig:
     progress_step: int = 64
     gpu_layers: int = 0
     thinking: bool = False
+    temperature: float = 0.0
     mtp_probe_enabled: bool = False
     mtp_dry_run_enabled: bool = False
     mtp_accept_probe_enabled: bool = False
@@ -365,6 +371,9 @@ class NativeLlamaClient:
     def __init__(self, paths: NativeLlamaPaths, config: NativeClientConfig | None = None) -> None:
         self.paths = paths
         self.config = config or NativeClientConfig()
+        if self.config.temperature > 0.0 and self.config.use_mtp_experimental:
+            # The MTP accept loop verifies drafts against the greedy target token.
+            raise ValueError("temperature > 0 is not supported with MTP")
         self.lib = LlamaLibrary(paths.build_bin)
         mtmd_bridge = _resolve_mtmd_bridge_path(paths)
         self.mtmd = (
@@ -672,7 +681,7 @@ class NativeLlamaClient:
         sampler_params = lib.llama_sampler_chain_default_params()
         sampler_params.no_perf = False
         self._session.sampler = lib.llama_sampler_chain_init(sampler_params)
-        lib.llama_sampler_chain_add(self._session.sampler, lib.llama_sampler_init_greedy())
+        _add_default_sampler_stages(lib, self._session.sampler, self.config.temperature)
         self._initialize_multimodal_context()
         self._initialize_mtp_probe()
         self._initialize_mtp_dry_run()
@@ -3978,7 +3987,8 @@ class NativeLlamaClient:
         `llama_state_seq_set_data`: Ornith, and since
         QWEN38-PROMPT-CACHE-REUSE-22 Qwen3.8 Flash Next (`qwen4exp`, whose
         `llama_memory_hybrid_idx` serializes the attention KV, the DeltaNet
-        recurrent state and the indexer cache together).
+        recurrent state and the indexer cache together), and the Saluki
+        `qwen35` hybrid (attention KV + Gated DeltaNet recurrent state).
         """
         if not route_prefix_anchor:
             return False
@@ -5014,11 +5024,15 @@ class NativeLlamaClient:
             "logits_row_count": 1,
             "n_outputs": 1,
             "last_logits_hash": self._last_logits_hash(),
-            "sampler_config_hash": _canonical_greedy_sampler_hash(),
+            "sampler_config_hash": _canonical_sampler_hash(self.config.temperature),
             "sampler_state_hash": None,
-            "sampler_chain_type": "llama_sampler_chain+greedy",
+            "sampler_chain_type": (
+                "llama_sampler_chain+temperature+dist"
+                if self.config.temperature > 0.0
+                else "llama_sampler_chain+greedy"
+            ),
             "seed_hash": None,
-            "temperature": 0.0,
+            "temperature": self.config.temperature,
             "top_k": 1,
             "top_p": 1.0,
             "min_p": 0.0,
@@ -5468,8 +5482,33 @@ def _is_gemma4_rendered(prompt: str) -> bool:
     return prompt.lstrip().startswith("<bos>") or "<|turn>" in prompt
 
 
-def _canonical_greedy_sampler_hash() -> str:
-    return hashlib.sha256(b'{"min_p":0.0,"repeat_penalty":1.0,"sampler":"greedy","temperature":0.0,"top_k":1,"top_p":1.0}').hexdigest()[:16]
+def _add_default_sampler_stages(lib, chain, temperature: float) -> None:
+    if temperature > 0.0:
+        # The temperature stage only rescales logits; the dist stage selects
+        # the token. Without it llama_sampler_sample() asserts.
+        stages = (
+            lib.llama_sampler_init_temp(temperature),
+            lib.llama_sampler_init_dist(LLAMA_DEFAULT_SEED),
+        )
+    else:
+        stages = (lib.llama_sampler_init_greedy(),)
+    if not all(stages):
+        # Never leave a half-built chain behind.
+        for stage in stages:
+            if stage:
+                lib.llama_sampler_free(stage)
+        raise RuntimeError("failed to create native sampler")
+    for stage in stages:
+        lib.llama_sampler_chain_add(chain, stage)
+
+
+def _canonical_sampler_hash(temperature: float = 0.0) -> str:
+    sampler = "greedy" if temperature <= 0.0 else "temperature"
+    payload = (
+        f'{{"min_p":0.0,"repeat_penalty":1.0,"sampler":"{sampler}",'
+        f'"temperature":{temperature!r},"top_k":1,"top_p":1.0}}'
+    ).encode()
+    return hashlib.sha256(payload).hexdigest()[:16]
 
 
 def _mtp_trace_enabled() -> bool:

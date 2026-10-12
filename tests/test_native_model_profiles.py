@@ -17,6 +17,8 @@ from orbit.native_llama.model_profiles import (
     QWEN36_PROFILE_ID,
     QWEN3_CODER_PROFILE_ID,
     QWEN38_PROFILE_ID,
+    QWEN38_SALUKI_PROFILE_ID,
+    QWEN38_SALUKI_OFFICIAL_TEMPLATE_SHA256,
     NativeModelProfile,
     detect_native_model_profile,
     supports_low_memory_mode,
@@ -58,6 +60,20 @@ QWEN38_METADATA = {
     "tokenizer.ggml.eos_token_id": "248046",
     "qwen35.context_length": "262144",
     "qwen35.block_count": "65",
+}
+
+QWEN38_SALUKI_METADATA = {
+    "general.architecture": "qwen35",
+    "general.name": "Qwen3.8-27B GSQ-RCO",
+    "general.file_type": "20",
+    "tokenizer.ggml.model": "gpt2",
+    "tokenizer.ggml.pre": "qwen35",
+    "tokenizer.ggml.bos_token_id": "248044",
+    "tokenizer.ggml.eos_token_id": "248046",
+    "tokenizer.ggml.padding_token_id": "248044",
+    "tokenizer.ggml.add_bos_token": "false",
+    "qwen35.context_length": "262144",
+    "qwen35.block_count": "64",
 }
 
 MINICPM5_METADATA = {
@@ -205,6 +221,74 @@ class Qwen38ProfileTests(unittest.TestCase):
         with mock.patch("orbit.native_llama.model_profiles.QWEN36_OFFICIAL_TEMPLATE_SHA256", digest):
             profile = detect_native_model_profile(QWEN_METADATA, "official-qwen-template")
         self.assertEqual(profile.profile_id, QWEN36_PROFILE_ID)
+
+
+class Qwen38SalukiProfileTests(unittest.TestCase):
+    def _detect(self, metadata=None, template="official-saluki-template"):
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        with mock.patch(
+            "orbit.native_llama.model_profiles.QWEN38_SALUKI_OFFICIAL_TEMPLATE_SHA256",
+            digest,
+        ):
+            return detect_native_model_profile(metadata or QWEN38_SALUKI_METADATA, template)
+
+    def test_exact_gguf_and_template_identity_is_verified(self) -> None:
+        profile = self._detect()
+        self.assertEqual(profile.profile_id, QWEN38_SALUKI_PROFILE_ID)
+        self.assertTrue(profile.verified)
+        self.assertEqual(profile.family, "qwen3.8-saluki")
+        self.assertEqual(profile.verified_quantization, "IQ2_XS")
+        self.assertEqual(profile.tool_call_protocol, "qwen3.6-xml")
+
+    def test_saluki_isolated_from_full_qwen38_profile(self) -> None:
+        profile = self._detect()
+        self.assertNotEqual(profile.profile_id, QWEN38_PROFILE_ID)
+
+    def test_cache_and_mtp_capabilities_are_not_inherited(self) -> None:
+        profile = self._detect()
+        self.assertFalse(profile.route_prefix_reuse_supported)
+        self.assertFalse(profile.mtp_supported)
+
+    def test_template_or_metadata_drift_fails_closed(self) -> None:
+        self.assertFalse(
+            detect_native_model_profile(QWEN38_SALUKI_METADATA, "wrong-template").verified
+        )
+        for key, value in (
+            ("general.architecture", "qwen35moe"),
+            ("general.name", "Qwen3.8-27B"),
+            ("general.file_type", "15"),
+            ("tokenizer.ggml.model", "llama"),
+            ("tokenizer.ggml.pre", "qwen2"),
+            ("tokenizer.ggml.bos_token_id", "1"),
+            ("tokenizer.ggml.eos_token_id", "2"),
+            ("tokenizer.ggml.padding_token_id", "0"),
+            ("tokenizer.ggml.add_bos_token", "true"),
+            ("qwen35.context_length", "131072"),
+            ("qwen35.block_count", "65"),
+        ):
+            with self.subTest(key=key):
+                profile = self._detect({**QWEN38_SALUKI_METADATA, key: value})
+                self.assertFalse(profile.verified)
+                self.assertNotEqual(profile.profile_id, QWEN38_SALUKI_PROFILE_ID)
+
+    def test_template_drift_fails_closed_under_the_patched_digest(self) -> None:
+        with mock.patch(
+            "orbit.native_llama.model_profiles.QWEN38_SALUKI_OFFICIAL_TEMPLATE_SHA256",
+            hashlib.sha256(b"official-saluki-template").hexdigest(),
+        ):
+            profile = detect_native_model_profile(QWEN38_SALUKI_METADATA, "drifted-template")
+        self.assertFalse(profile.verified)
+        self.assertEqual(profile.failure_reason, "qwen38_saluki_template_identity_mismatch")
+
+    def test_saluki_drift_reports_saluki_reasons(self) -> None:
+        for key, value, reason in (
+            ("tokenizer.ggml.pre", "qwen2", "qwen38_saluki_tokenizer_identity_mismatch"),
+            ("general.file_type", "15", "qwen38_saluki_quantization_identity_mismatch"),
+            ("qwen35.block_count", "65", "qwen38_saluki_metadata_identity_mismatch"),
+        ):
+            with self.subTest(key=key):
+                profile = self._detect({**QWEN38_SALUKI_METADATA, key: value})
+                self.assertEqual(profile.failure_reason, reason)
 
 
 class NativeModelProfileTests(unittest.TestCase):

@@ -56,6 +56,16 @@ the directory when needed and appends structured request/response events to
 orbit server --log workdir/server-log
 ```
 
+To select non-greedy native generation at startup, pass a non-negative
+temperature; the default `0` keeps greedy decoding. The value is server-wide:
+it overrides any per-request temperature, grammar-constrained calls (required
+tool calls, Qwen3-Coder artifacts) stay greedy, and it cannot be combined with `--mtp`. Keep the
+default `0` for qualification runs, which assume greedy decoding:
+
+```bash
+orbit server --temperature 0.7
+```
+
 Leave the server terminal running. In a second terminal, open the same checkout:
 
 ```bash
@@ -110,6 +120,7 @@ This list is not a performance ranking.
 | MiniCPM5 2B | Q4_K_M |
 | Qwen3.8 Flash Next | UD-IQ1_M, three shards |
 | LFM2.5 8B-A1B | UD-Q4_K_M, Q8_0, UD-Q6_K |
+| Underdog Saluki 27B 1.0 | IQ2_XS (IQ2-mix GGUF) |
 | Granite 4.2 3B | Q4_K_M, Q8_0 |
 | Granite 4.2 8B | Q4_K_M, Q6_K |
 
@@ -132,6 +143,13 @@ That result does not extend to every Qwen model or quantization.
 LFM2.5 8B-A1B uses a distinct verified profile and rolling route-cache identity;
 its cache round-trip still requires real-model qualification before performance
 or broader workflow claims are made.
+
+Underdog Saluki 27B 1.0 (a Qwen3.8-27B derivative) uses its own verified
+profile, separate from the full Qwen3.8 27B Q4_K_M profile, and CHAT route
+calls use the rolling route checkpoint after a real-model state round-trip
+qualification. MTP, the fixed-head route prefix and the optional `mmproj` are
+not qualified; see the
+[Saluki checkpoint](docs/checkpoints/underdog-saluki-qualification.md).
 
 See the [qualification scope](docs/ANALYSIS_QUALIFICATION.md) and
 [semantic baseline](docs/ANALYSIS_SEMANTIC_BASELINE.md) for evidence and limits.

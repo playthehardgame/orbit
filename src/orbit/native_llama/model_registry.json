@@ -157,6 +157,18 @@
         "file": "granite-4.2-8b-Q4_K_M.gguf",
         "cache_glob": "models--ibm-granite--granite-4.2-8b-GGUF/snapshots/*/granite-4.2-8b-Q4_K_M.gguf"
       }
+    },
+    {
+      "id": "underdog-saluki-27b-iq2-xs",
+      "display_name": "Underdog Saluki 27B 1.0",
+      "profile_id": "orbit-qwen38-saluki-native-v1",
+      "backend": "native-llama",
+      "architecture": "qwen35",
+      "target": {
+        "repo": "ConwayResearch/Underdog-Saluki-27B-1.0",
+        "file": "Underdog-Saluki-27B-1.0-IQ2-mix.gguf",
+        "cache_glob": "models--ConwayResearch--Underdog-Saluki-27B-1.0/snapshots/*/Underdog-Saluki-27B-1.0-IQ2-mix.gguf"
+      }
     }
   ]
 }

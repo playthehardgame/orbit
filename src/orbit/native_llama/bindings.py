@@ -340,6 +340,10 @@ class LlamaLibrary:
         lib.llama_sampler_chain_init.restype = c_void_p
         lib.llama_sampler_chain_add.argtypes = [c_void_p, c_void_p]
         lib.llama_sampler_chain_add.restype = None
+        lib.llama_sampler_init_temp.argtypes = [c_float]
+        lib.llama_sampler_init_temp.restype = c_void_p
+        lib.llama_sampler_init_dist.argtypes = [c_uint32]
+        lib.llama_sampler_init_dist.restype = c_void_p
         lib.llama_sampler_init_greedy.argtypes = []
         lib.llama_sampler_init_greedy.restype = c_void_p
         lib.llama_sampler_init_grammar.argtypes = [c_void_p, c_char_p, c_char_p]

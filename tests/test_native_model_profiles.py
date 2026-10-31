@@ -17,6 +17,8 @@ from orbit.native_llama.model_profiles import (
     QWEN36_PROFILE_ID,
     QWEN3_CODER_PROFILE_ID,
     QWEN38_PROFILE_ID,
+    GEMMA4_E4B_HERETIC_PROFILE_ID,
+    GEMMA4_E4B_HERETIC_TEMPLATE_SHA256,
     QWEN38_9B_DISTILL_PROFILE_ID,
     QWEN38_SALUKI_PROFILE_ID,
     QWEN38_SALUKI_OFFICIAL_TEMPLATE_SHA256,
@@ -88,6 +90,19 @@ QWEN38_9B_DISTILL_METADATA = {
     "tokenizer.ggml.add_bos_token": "false",
     "qwen35.context_length": "262144",
     "qwen35.block_count": "33",
+}
+
+GEMMA4_E4B_HERETIC_METADATA = {
+    "general.architecture": "gemma4",
+    "general.name": "Gemma 4 E4B It Ultra Uncensored Heretic",
+    "general.file_type": "15",
+    "tokenizer.ggml.model": "gemma4",
+    "tokenizer.ggml.bos_token_id": "2",
+    "tokenizer.ggml.eos_token_id": "1",
+    "tokenizer.ggml.padding_token_id": "0",
+    "gemma4.context_length": "131072",
+    "gemma4.block_count": "42",
+    "gemma4.embedding_length_per_layer_input": "256",
 }
 
 MINICPM5_METADATA = {
@@ -340,6 +355,120 @@ class Qwen38NineBDistillProfileTests(unittest.TestCase):
                 self.assertEqual(profile.failure_reason, reason)
         profile = self._detect(template="drifted")
         self.assertEqual(profile.failure_reason, "qwen38_9b_distill_template_identity_mismatch")
+
+
+class Gemma4E4BHereticProfileTests(unittest.TestCase):
+    TEMPLATE = "official-e4b-heretic-template"
+
+    def _detect(self, metadata=None, template=None):
+        digest = hashlib.sha256(self.TEMPLATE.encode()).hexdigest()
+        with mock.patch(
+            "orbit.native_llama.model_profiles.GEMMA4_E4B_HERETIC_TEMPLATE_SHA256", digest
+        ):
+            return detect_native_model_profile(
+                metadata or GEMMA4_E4B_HERETIC_METADATA, template or self.TEMPLATE
+            )
+
+    def test_exact_identity_is_verified_and_isolated(self) -> None:
+        profile = self._detect()
+        self.assertEqual(profile.profile_id, GEMMA4_E4B_HERETIC_PROFILE_ID)
+        self.assertNotEqual(profile.profile_id, GEMMA4_PROFILE_ID)
+        self.assertTrue(profile.verified)
+        self.assertEqual(profile.verified_quantization, "Q4_K_M")
+        self.assertEqual(profile.tool_call_protocol, "gemma4-native")
+        for flag in (
+            profile.mtp_supported,
+            profile.gemma_prefix_reuse_supported,
+            profile.route_prefix_reuse_supported,
+        ):
+            self.assertFalse(flag)
+        self.assertTrue(profile.multimodal_supported)
+
+    def test_drift_fails_closed_with_specific_reasons(self) -> None:
+        for key, value, reason in (
+            ("tokenizer.ggml.model", "gpt2", "gemma4_e4b_heretic_tokenizer_identity_mismatch"),
+            ("general.file_type", "17", "gemma4_e4b_heretic_quantization_identity_mismatch"),
+            ("gemma4.block_count", "35", "gemma4_e4b_heretic_metadata_identity_mismatch"),
+            ("tokenizer.ggml.eos_token_id", "106", "gemma4_e4b_heretic_metadata_identity_mismatch"),
+        ):
+            with self.subTest(key=key):
+                profile = self._detect({**GEMMA4_E4B_HERETIC_METADATA, key: value})
+                self.assertFalse(profile.verified)
+                self.assertEqual(profile.failure_reason, reason)
+        profile = self._detect(template="drifted")
+        self.assertEqual(profile.failure_reason, "gemma4_e4b_heretic_template_identity_mismatch")
+
+    def test_capability_manifest_does_not_report_unsupported(self) -> None:
+        profile = self._detect()
+        manifest = safe_native_capability_manifest(
+            SimpleNamespace(model_profile=profile),
+            final_system_prompt=FINAL_FROM_TOOL_SYSTEM_PROMPT,
+        )
+        self.assertEqual(manifest["profile_id"], GEMMA4_E4B_HERETIC_PROFILE_ID)
+        self.assertEqual(manifest["status"], "verified")
+
+    def test_real_gguf_template_matches_pinned_hash(self) -> None:
+        import glob
+        from pathlib import Path
+
+        from orbit.native_llama.gguf_split import read_gguf_header
+
+        matches = glob.glob(
+            "/mnt/l/models/llmfan46--*/gemma-4-E4B-it-ultra-uncensored-heretic-Q4_K_M.gguf"
+        )
+        if not matches:
+            self.skipTest("E4B Heretic GGUF not present on this host")
+        header = read_gguf_header(Path(matches[0]))
+        metadata = {k: str(v) for k, v in header.kv.items() if not isinstance(v, list)}
+        profile = detect_native_model_profile(metadata, header.kv["tokenizer.chat_template"])
+        self.assertTrue(profile.verified, profile.failure_reason)
+        self.assertEqual(profile.profile_id, GEMMA4_E4B_HERETIC_PROFILE_ID)
+
+    def test_26b_with_zero_per_layer_input_keeps_26b_profile(self) -> None:
+        for name in ("gemma-4-26B-A4B-it", "Some Other Gemma4 Build"):
+            with self.subTest(name=name):
+                profile = detect_native_model_profile(
+                    {
+                        **GEMMA4_E4B_HERETIC_METADATA,
+                        "general.name": name,
+                        "gemma4.embedding_length_per_layer_input": "0",
+                        "gemma4.block_count": "30",
+                    },
+                    "x",
+                )
+                self.assertEqual(profile.profile_id, GEMMA4_PROFILE_ID)
+
+    def test_heretic_requires_per_layer_input_256(self) -> None:
+        profile = self._detect(
+            {**GEMMA4_E4B_HERETIC_METADATA, "gemma4.embedding_length_per_layer_input": "0"}
+        )
+        self.assertFalse(profile.verified)
+        self.assertEqual(profile.failure_reason, "gemma4_e4b_heretic_metadata_identity_mismatch")
+
+    def test_real_template_hash_is_pinned(self) -> None:
+        self.assertEqual(
+            GEMMA4_E4B_HERETIC_TEMPLATE_SHA256,
+            "781d10940fbc44be40064b5d43a056fc486c84ceaa55538226368b57314132bf",
+        )
+
+    def test_other_e_series_gemma4_models_fail_closed(self) -> None:
+        for name in ("gemma-4-E4B-it", "Gemma 4 E2B It"):
+            with self.subTest(name=name):
+                profile = detect_native_model_profile(
+                    {**GEMMA4_E4B_HERETIC_METADATA, "general.name": name}, "x"
+                )
+                self.assertFalse(profile.verified)
+                self.assertEqual(profile.failure_reason, "gemma4_e_series_unqualified")
+
+    def test_other_gemma4_models_keep_the_26b_profile(self) -> None:
+        profile = detect_native_model_profile(
+            {
+                **{k: v for k, v in GEMMA4_E4B_HERETIC_METADATA.items() if "per_layer" not in k},
+                "general.name": "gemma-4-26B-A4B-it",
+            },
+            "x",
+        )
+        self.assertEqual(profile.profile_id, GEMMA4_PROFILE_ID)
 
 
 class NativeModelProfileTests(unittest.TestCase):

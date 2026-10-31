@@ -181,6 +181,23 @@
         "file": "Qwen3.8-9B-Q4_K_M.gguf",
         "cache_glob": "models--empero-ai--Qwen3.8-9B-Distill-GGUF/snapshots/*/Qwen3.8-9B-Q4_K_M.gguf"
       }
+    },
+    {
+      "id": "gemma4-e4b-heretic-q4-k-m",
+      "display_name": "Gemma 4 E4B Heretic",
+      "profile_id": "orbit-gemma4-e4b-heretic-native-v1",
+      "backend": "native-llama",
+      "architecture": "gemma4",
+      "target": {
+        "repo": "llmfan46/gemma-4-E4B-it-ultra-uncensored-heretic-GGUF",
+        "file": "gemma-4-E4B-it-ultra-uncensored-heretic-Q4_K_M.gguf",
+        "cache_glob": "models--llmfan46--gemma-4-E4B-it-ultra-uncensored-heretic-GGUF/snapshots/*/gemma-4-E4B-it-ultra-uncensored-heretic-Q4_K_M.gguf"
+      },
+      "mmproj": {
+        "repo": "llmfan46/gemma-4-E4B-it-ultra-uncensored-heretic-GGUF",
+        "file": "gemma-4-E4B-it-mmproj-BF16.gguf",
+        "cache_glob": "models--llmfan46--gemma-4-E4B-it-ultra-uncensored-heretic-GGUF/snapshots/*/gemma-4-E4B-it-mmproj-BF16.gguf"
+      }
     }
   ]
 }

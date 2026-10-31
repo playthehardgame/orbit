@@ -122,6 +122,7 @@ This list is not a performance ranking.
 | LFM2.5 8B-A1B | UD-Q4_K_M, Q8_0, UD-Q6_K |
 | Underdog Saluki 27B 1.0 | IQ2_XS (IQ2-mix GGUF) |
 | Qwen3.8 9B Distill | Q4_K_M |
+| Gemma 4 E4B Heretic | Q4_K_M (BF16 mmproj; image/audio smoke-tested) |
 | Granite 4.2 3B | Q4_K_M, Q8_0 |
 | Granite 4.2 8B | Q4_K_M, Q6_K |
 

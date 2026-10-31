@@ -8,6 +8,15 @@ from typing import Mapping
 
 GEMMA4_PROFILE_ID = "orbit-gemma4-native-v1"
 GEMMA4_VERIFIED_MODEL_NAME = "gemma-4-26B-A4B-it"
+# Gemma 4 E4B "ultra uncensored heretic" finetune: one exact Q4_K_M artifact
+# (general.file_type 15), isolated from the 26B-A4B profile. MTP, final-prefix
+# reuse and route-prefix reuse stay unqualified; image/audio input uses the
+# declared BF16 mmproj (clip gemma4v/gemma4a).
+GEMMA4_E4B_HERETIC_PROFILE_ID = "orbit-gemma4-e4b-heretic-native-v1"
+GEMMA4_E4B_HERETIC_VERIFIED_MODEL_NAME = "Gemma 4 E4B It Ultra Uncensored Heretic"
+GEMMA4_E4B_HERETIC_TEMPLATE_SHA256 = "781d10940fbc44be40064b5d43a056fc486c84ceaa55538226368b57314132bf"
+GEMMA4_E4B_HERETIC_VERIFIED_FILE_TYPE = "15"
+GEMMA4_E4B_HERETIC_VERIFIED_QUANTIZATION = "Q4_K_M"
 QWEN36_PROFILE_ID = "orbit-qwen36-native-v1"
 QWEN36_VERIFIED_MODEL_NAME = "Qwen3.6-35B-A3B"
 QWEN36_OFFICIAL_TEMPLATE_SHA256 = "e84f32a23fdda27689f868aa4a1a5621f41133e51a48d7f3efcbea2839574259"
@@ -67,6 +76,9 @@ PROFILE_METADATA_KEYS = frozenset(
         "tokenizer.ggml.bos_token_id",
         "tokenizer.ggml.eos_token_id",
         "tokenizer.ggml.padding_token_id",
+        "gemma4.context_length",
+        "gemma4.block_count",
+        "gemma4.embedding_length_per_layer_input",
         "qwen3moe.context_length",
         "qwen3moe.block_count",
         "qwen3moe.expert_count",
@@ -261,6 +273,9 @@ class VerifiedNativeModelIdentity:
 
 VERIFIED_NATIVE_MODEL_IDENTITIES = (
     VerifiedNativeModelIdentity(GEMMA4_PROFILE_ID, GEMMA4_VERIFIED_MODEL_NAME, "gemma4"),
+    VerifiedNativeModelIdentity(
+        GEMMA4_E4B_HERETIC_PROFILE_ID, GEMMA4_E4B_HERETIC_VERIFIED_MODEL_NAME, "gemma4"
+    ),
     VerifiedNativeModelIdentity(QWEN36_PROFILE_ID, QWEN36_VERIFIED_MODEL_NAME, "qwen35moe"),
     VerifiedNativeModelIdentity(
         ORNITH15_PROFILE_ID,
@@ -328,7 +343,52 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
     file_type = metadata.get("general.file_type", "").strip()
     template_hash = hashlib.sha256(template.encode("utf-8")).hexdigest()
 
-    if architecture == "gemma4" and tokenizer_model == "gemma4":
+    # Per-layer-embedding (E2B/E4B) Gemma 4 models are a different family from
+    # the qualified 26B-A4B; only the exact E4B Heretic artifact is verified.
+    gemma4_e_series = (
+        architecture == "gemma4"
+        and metadata.get("gemma4.embedding_length_per_layer_input", "").strip() not in ("", "0")
+    ) or model_name == GEMMA4_E4B_HERETIC_VERIFIED_MODEL_NAME
+    gemma4_e4b_heretic_identity = (
+        architecture == "gemma4"
+        and model_name == GEMMA4_E4B_HERETIC_VERIFIED_MODEL_NAME
+        and tokenizer_model == "gemma4"
+        and file_type == GEMMA4_E4B_HERETIC_VERIFIED_FILE_TYPE
+        and metadata.get("tokenizer.ggml.bos_token_id", "").strip() == "2"
+        and metadata.get("tokenizer.ggml.eos_token_id", "").strip() == "1"
+        and metadata.get("tokenizer.ggml.padding_token_id", "").strip() == "0"
+        and metadata.get("gemma4.context_length", "").strip() == "131072"
+        and metadata.get("gemma4.block_count", "").strip() == "42"
+        and metadata.get("gemma4.embedding_length_per_layer_input", "").strip() == "256"
+        and template_hash == GEMMA4_E4B_HERETIC_TEMPLATE_SHA256
+    )
+    if gemma4_e4b_heretic_identity:
+        return NativeModelProfile(
+            profile_id=GEMMA4_E4B_HERETIC_PROFILE_ID,
+            family="gemma4-e4b-heretic",
+            model_name=model_name,
+            architecture=architecture,
+            renderer="orbit-gemma4",
+            reasoning_protocol="gemma4-control-channel",
+            tool_call_protocol="gemma4-native",
+            history_serialization="orbit-native-roles",
+            verified=True,
+            failure_reason=None,
+            template_source="gguf-embedded-reviewed",
+            template_sha256=template_hash,
+            thinking_supported=True,
+            mtp_supported=False,
+            gemma_prefix_reuse_supported=False,
+            verified_quantization=GEMMA4_E4B_HERETIC_VERIFIED_QUANTIZATION,
+            route_prefix_reuse_supported=False,
+            multimodal_supported=True,
+        )
+
+    if (
+        architecture == "gemma4"
+        and tokenizer_model == "gemma4"
+        and not gemma4_e_series
+    ):
         return NativeModelProfile(
             profile_id=GEMMA4_PROFILE_ID,
             family="gemma4",
@@ -750,6 +810,7 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
         tokenizer_pre=tokenizer_pre,
         file_type=file_type,
         template_hash=template_hash,
+        gemma4_e_series=gemma4_e_series,
     )
     return NativeModelProfile(
         profile_id="unsupported",
@@ -778,7 +839,18 @@ def _unverified_reason(
     tokenizer_pre: str,
     file_type: str,
     template_hash: str,
+    gemma4_e_series: bool = False,
 ) -> str:
+    if architecture == "gemma4" and gemma4_e_series and model_name != GEMMA4_E4B_HERETIC_VERIFIED_MODEL_NAME:
+        return "gemma4_e_series_unqualified"
+    if architecture == "gemma4" and model_name == GEMMA4_E4B_HERETIC_VERIFIED_MODEL_NAME:
+        if tokenizer_model != "gemma4":
+            return "gemma4_e4b_heretic_tokenizer_identity_mismatch"
+        if file_type != GEMMA4_E4B_HERETIC_VERIFIED_FILE_TYPE:
+            return "gemma4_e4b_heretic_quantization_identity_mismatch"
+        if template_hash != GEMMA4_E4B_HERETIC_TEMPLATE_SHA256:
+            return "gemma4_e4b_heretic_template_identity_mismatch"
+        return "gemma4_e4b_heretic_metadata_identity_mismatch"
     if architecture == "qwen35moe":
         if model_name == ORNITH15_VERIFIED_MODEL_NAME:
             if tokenizer_model != "gpt2" or tokenizer_pre != "qwen35":

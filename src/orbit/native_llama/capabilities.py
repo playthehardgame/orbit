@@ -11,6 +11,7 @@ from typing import Any, Protocol
 from .bindings import load_native_cdll, native_cdll_flags
 from .chat_template import render_gemma4_chat, render_gemma4_route_prompt_segments
 from .model_profiles import (
+    GEMMA4_E4B_HERETIC_PROFILE_ID,
     GEMMA4_PROFILE_ID,
     GRANITE42_PROFILE_ID,
     GRANITE42_8B_PROFILE_ID,
@@ -59,6 +60,7 @@ def safe_native_capability_manifest(client: _TokenizingClient, *, final_system_p
         MINICPM5_PROFILE_ID,
         GRANITE42_PROFILE_ID,
         GRANITE42_8B_PROFILE_ID,
+        GEMMA4_E4B_HERETIC_PROFILE_ID,
     }:
         build_bin = _client_build_bin(client)
         build = read_llama_cpp_build_info(build_bin) if build_bin is not None else _unavailable_build("build_bin_unavailable")

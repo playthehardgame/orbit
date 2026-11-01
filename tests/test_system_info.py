@@ -47,7 +47,10 @@ class SystemInfoTests(unittest.TestCase):
         self.assertNotIn("HOME=", output)
         self.assertNotIn("PATH=", output)
         self.assertNotRegex(output, r"\b(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\b")
-        self.assertNotRegex(output, r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+        # The kernel release (e.g. WSL2 "6.6.87.2-microsoft...") is four dotted
+        # numbers but is not an address; check everything except the OS line.
+        without_os = "\n".join(line for line in output.splitlines() if not line.startswith("OS:"))
+        self.assertNotRegex(without_os, r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 
     def test_memory_fallback_when_proc_meminfo_unavailable(self) -> None:
         with patch("orbit.runtime.system_info._read_linux_meminfo", return_value={}):

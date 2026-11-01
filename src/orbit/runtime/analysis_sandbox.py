@@ -51,7 +51,19 @@ CPU_SECONDS = 14
 ADDRESS_SPACE_BYTES = 768 * 1024 * 1024
 FILE_SIZE_BYTES = 64 * 1024
 OPEN_FILES = 96
-EXTRA_PROCESSES = 32
+# Headroom above the tasks the user already owns. Some hosts (WSL2) own tasks
+# that /proc does not show, so the count undershoots and bubblewrap cannot fork;
+# ORBIT_ANALYSIS_EXTRA_PROCESSES raises the headroom there. Invalid or
+# non-positive values keep the default.
+def _extra_processes() -> int:
+    try:
+        value = int(os.environ.get("ORBIT_ANALYSIS_EXTRA_PROCESSES", ""))
+    except ValueError:
+        return 32
+    return value if 0 < value <= 1024 else 32
+
+
+EXTRA_PROCESSES = _extra_processes()
 MAX_CODE_CHARS = 32 * 1024
 MAX_OUTPUT_BYTES = 64 * 1024
 HARD_OUTPUT_BYTES = 2 * 1024 * 1024

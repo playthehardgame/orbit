@@ -308,7 +308,10 @@ def _read_stable_regular_file(path: str, *, workdir: Path, max_bytes: int) -> St
                 return f"error: file too large for text snapshot: more than {max_bytes} bytes"
             if _file_version(before) != _file_version(after):
                 return "error: file changed while it was being read; snapshot discarded"
-            current = os.stat(relative.parts[-1], dir_fd=directory_fd, follow_symlinks=False)
+            try:
+                current = os.stat(relative.parts[-1], dir_fd=directory_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                return "error: file disappeared while it was being read; snapshot discarded"
             if not stat.S_ISREG(current.st_mode) or (current.st_dev, current.st_ino) != (after.st_dev, after.st_ino):
                 return "error: file was replaced while it was being read; snapshot discarded"
             try:

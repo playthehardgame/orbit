@@ -79,6 +79,7 @@ class ExpertUsageTests(unittest.TestCase):
         handler = OrbitNativeHandler.__new__(OrbitNativeHandler)
         handler._state = mock.Mock(return_value=state)
         handler._json = mock.Mock()
+        handler._logger = mock.Mock(return_value=None)
 
         handler.path = "/diagnostics/expert-usage"
         handler.do_GET()
@@ -95,6 +96,7 @@ class ExpertUsageTests(unittest.TestCase):
         handler = OrbitNativeHandler.__new__(OrbitNativeHandler)
         handler._state = mock.Mock(return_value=state)
         handler._json = mock.Mock()
+        handler._logger = mock.Mock(return_value=None)
         handler.path = "/diagnostics/expert-usage/reset"
 
         handler.do_POST()

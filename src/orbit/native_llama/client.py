@@ -53,6 +53,7 @@ from .model_profiles import (
     ORNITH15_PROFILE_ID,
     PROFILE_METADATA_KEYS,
     QWEN36_PROFILE_ID,
+    QWEN38_9B_DISTILL_PROFILE_ID,
     QWEN38_FLASH_NEXT_PROFILE_ID,
     QWEN38_SALUKI_PROFILE_ID,
     QWEN3_CODER_PROFILE_ID,
@@ -173,8 +174,16 @@ ROLLING_ROUTE_PROFILE_IDS = frozenset(
         QWEN38_FLASH_NEXT_PROFILE_ID,
         LFM25_PROFILE_ID,
         QWEN38_SALUKI_PROFILE_ID,
+        QWEN38_9B_DISTILL_PROFILE_ID,
     }
 )
+# The rolling-route profiles whose route checkpoint is taken at the turn
+# boundary, before the generation prompt, instead of at the end of the prompt.
+# Needed when the template renders a historical assistant turn without the
+# generation prompt's own tail (Qwen3.8 9B Distill drops the empty think
+# block), so the next route prompt can never extend a whole-prompt checkpoint.
+# A subset of the rolling set; every other profile keeps the whole-prompt capture.
+ROLLING_ROUTE_BOUNDARY_PROFILE_IDS = frozenset({QWEN38_9B_DISTILL_PROFILE_ID})
 # The profiles whose route checkpoint is advanced past the committed reply
 # after a final call (QWEN38-POST-FINAL-ROUTE-CACHE-23). A subset of the
 # rolling set: the mechanism is generic, but each profile is admitted on its
@@ -1637,7 +1646,14 @@ class NativeLlamaClient:
         # Only the native bridge reports it; a profile rendered any other way
         # passes None and keeps the whole-prompt capture it has today.
         rolling_boundary_suffix = (
-            self._generation_prompt_suffix() if rolling_analysis_eligible else None
+            self._generation_prompt_suffix()
+            if rolling_analysis_eligible
+            or (
+                rolling_route_eligible
+                and getattr(self.model_profile, "profile_id", None)
+                in ROLLING_ROUTE_BOUNDARY_PROFILE_IDS
+            )
+            else None
         )
         sampler = self._create_required_tool_sampler() if tool_choice == "required" else None
         try:
@@ -2862,7 +2878,14 @@ class NativeLlamaClient:
             and rolling_route_identity is not None
             and rolling_route_identity.strategy_id == ROLLING_ANALYSIS_STRATEGY_ID
         )
-        if control_lineage:
+        route_boundary_lineage = (
+            rolling_route_eligible
+            and rolling_route_identity is not None
+            and rolling_route_identity.strategy_id == ROLLING_ROUTE_STRATEGY_ID
+            and getattr(getattr(self, "model_profile", None), "profile_id", None)
+            in ROLLING_ROUTE_BOUNDARY_PROFILE_IDS
+        )
+        if control_lineage or route_boundary_lineage:
             boundary = rolling_capture_boundary(
                 prompt,
                 prompt_tokens,
@@ -2956,9 +2979,22 @@ class NativeLlamaClient:
                 # with the STEP in its own slot a stale FINISH checkpoint would
                 # otherwise block every later FINISH from being captured, and
                 # its repair would prefill cold (measured live: 3 of 4 repairs).
-                if step_lineage or control_lineage or rolling_route_should_replace(
-                    slot_state, boundary_tokens, rolling_route_identity
-                ):
+                if route_boundary_lineage:
+                    # The CHAT route keeps its older checkpoint when this one
+                    # does not extend it, and records the miss so a reset or
+                    # compacted conversation can take the slot later.
+                    capture_boundary = self._rolling_route_capture_allowed(
+                        boundary_tokens, rolling_route_identity
+                    )
+                else:
+                    capture_boundary = (
+                        step_lineage
+                        or control_lineage
+                        or rolling_route_should_replace(
+                            slot_state, boundary_tokens, rolling_route_identity
+                        )
+                    )
+                if capture_boundary:
                     captured, _capture_meta = capture_rolling_route_anchor(
                         lib,
                         self._session.ctx_tgt,

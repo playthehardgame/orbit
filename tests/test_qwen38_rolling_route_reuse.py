@@ -36,12 +36,14 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+import orbit.native_llama.client as client_module
 from orbit.native_llama.client import ROLLING_ROUTE_PROFILE_IDS, NativeLlamaClient
 from orbit.native_llama.model_profiles import (
     GEMMA4_PROFILE_ID,
     LFM25_PROFILE_ID,
     ORNITH15_PROFILE_ID,
     QWEN36_PROFILE_ID,
+    QWEN38_9B_DISTILL_PROFILE_ID,
     QWEN38_FLASH_NEXT_PROFILE_ID,
     QWEN38_PROFILE_ID,
     QWEN38_SALUKI_PROFILE_ID,
@@ -199,7 +201,7 @@ class EligibilityTest(unittest.TestCase):
             )
         )
 
-    def test_the_qualified_set_is_exactly_ornith_flash_next_lfm25_and_saluki(self) -> None:
+    def test_the_qualified_set_is_exactly_ornith_flash_next_lfm25_saluki_and_distill(self) -> None:
         self.assertEqual(
             ROLLING_ROUTE_PROFILE_IDS,
             {
@@ -207,6 +209,7 @@ class EligibilityTest(unittest.TestCase):
                 QWEN38_FLASH_NEXT_PROFILE_ID,
                 LFM25_PROFILE_ID,
                 QWEN38_SALUKI_PROFILE_ID,
+                QWEN38_9B_DISTILL_PROFILE_ID,
             },
         )
         for profile_id in (
@@ -230,6 +233,37 @@ class EligibilityTest(unittest.TestCase):
                 route_prefix_anchor=True, tools=None, thinking=False
             )
         )
+
+    def test_distill_route_calls_are_eligible_and_boundary_captured(self) -> None:
+        client, _ = flash_next_client()
+        client.model_profile = _Profile(QWEN38_9B_DISTILL_PROFILE_ID)
+        self.assertTrue(
+            client._ornith_rolling_route_eligible(
+                route_prefix_anchor=True, tools=None, thinking=False
+            )
+        )
+        self.assertEqual(
+            client_module.ROLLING_ROUTE_BOUNDARY_PROFILE_IDS, {QWEN38_9B_DISTILL_PROFILE_ID}
+        )
+        self.assertTrue(
+            client_module.ROLLING_ROUTE_BOUNDARY_PROFILE_IDS <= ROLLING_ROUTE_PROFILE_IDS
+        )
+        self.assertNotIn(
+            QWEN38_9B_DISTILL_PROFILE_ID, client_module.POST_FINAL_ROUTE_SHADOW_PROFILE_IDS
+        )
+
+    def test_distill_rolling_identity_is_not_the_saluki_or_full_identity(self) -> None:
+        client = NativeLlamaClient.__new__(NativeLlamaClient)
+        client.paths = types.SimpleNamespace(model=Path("/models/same.gguf"))
+        client.config = types.SimpleNamespace(context_tokens=4096, thinking=False)
+        client._session = types.SimpleNamespace(session_id="s1")
+        client._model_metadata_identity = {"general.architecture": "qwen35"}
+        client._reset_generation = 0
+        client.model_profile = _Profile(QWEN38_9B_DISTILL_PROFILE_ID)
+        distill = client._rolling_route_identity(tools=None)
+        for other in (QWEN38_SALUKI_PROFILE_ID, QWEN38_PROFILE_ID):
+            client.model_profile = _Profile(other)
+            self.assertNotEqual(distill, client._rolling_route_identity(tools=None))
 
     def test_saluki_rolling_identity_is_not_the_full_qwen38_identity(self) -> None:
         # Same session, same file path, same metadata: only the profile differs.

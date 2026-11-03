@@ -182,6 +182,8 @@ class CaptureBlockTests(unittest.TestCase):
             "rolling_route_eligible": True, "rolling_route_identity": ident,
             "ROLLING_ANALYSIS_STRATEGY_ID": ROLLING_ANALYSIS_STRATEGY_ID,
             "ROLLING_STEP_STRATEGY_ID": ROLLING_STEP_STRATEGY_ID,
+            "ROLLING_ROUTE_STRATEGY_ID": client_module.ROLLING_ROUTE_STRATEGY_ID,
+            "ROLLING_ROUTE_BOUNDARY_PROFILE_IDS": client_module.ROLLING_ROUTE_BOUNDARY_PROFILE_IDS,
             "ROLLING_CONTROL_HISTORY_STRATEGY_ID": ROLLING_CONTROL_HISTORY_STRATEGY_ID,
             "replace": client_module.replace,
             "rolling_capture_boundary": rolling_capture_boundary, "rolling_step_boundary": rolling_step_boundary,

@@ -30,6 +30,7 @@ import json
 import sys
 import textwrap
 import threading
+import types
 import unittest
 import weakref
 from pathlib import Path
@@ -43,7 +44,12 @@ if str(SRC) not in sys.path:
 import orbit.backend.llama_server as llama_server
 import orbit.native_llama.client as client_module
 from orbit.native_llama.client import NativeLlamaClient
-from orbit.native_llama.model_profiles import ORNITH15_PROFILE_ID
+from orbit.native_llama.model_profiles import (
+    ORNITH15_PROFILE_ID,
+    QWEN38_9B_DISTILL_PROFILE_ID,
+    QWEN38_FLASH_NEXT_PROFILE_ID,
+    QWEN38_SALUKI_PROFILE_ID,
+)
 from orbit.native_llama.rolling_anchor_store import RollingAnchorStore
 from orbit.native_llama.rolling_route_anchor import (
     ROLLING_ANALYSIS_STRATEGY_ID,
@@ -541,8 +547,11 @@ class StepCaptureBlockTest(unittest.TestCase):
     """What the STEP lineage snapshots, where, and when it does not."""
 
     def _run(self, *, ident, head, prompt_tokens, processed, existing=None,
-             cancelled=False, capture_result=None, eligible=True, suffix=None):
+             cancelled=False, capture_result=None, eligible=True, suffix=None,
+             profile_id=None):
         client = NativeLlamaClient.__new__(NativeLlamaClient)
+        if profile_id is not None:
+            client.model_profile = types.SimpleNamespace(profile_id=profile_id)  # type: ignore[assignment]
         store = client._rolling_anchor_store()
         if existing is not None:
             store.store(existing.identity, existing)
@@ -570,6 +579,8 @@ class StepCaptureBlockTest(unittest.TestCase):
             "rolling_route_identity": ident,
             "ROLLING_ANALYSIS_STRATEGY_ID": ROLLING_ANALYSIS_STRATEGY_ID,
             "ROLLING_STEP_STRATEGY_ID": ROLLING_STEP_STRATEGY_ID,
+            "ROLLING_ROUTE_STRATEGY_ID": ROLLING_ROUTE_STRATEGY_ID,
+            "ROLLING_ROUTE_BOUNDARY_PROFILE_IDS": client_module.ROLLING_ROUTE_BOUNDARY_PROFILE_IDS,
             "ROLLING_CONTROL_HISTORY_STRATEGY_ID": client_module.ROLLING_CONTROL_HISTORY_STRATEGY_ID,
             "replace": client_module.replace,
             "rolling_capture_boundary": rolling_capture_boundary,
@@ -731,6 +742,8 @@ class StepCaptureBlockTest(unittest.TestCase):
             "rolling_route_eligible": True, "rolling_route_identity": step_identity(),
             "ROLLING_ANALYSIS_STRATEGY_ID": ROLLING_ANALYSIS_STRATEGY_ID,
             "ROLLING_STEP_STRATEGY_ID": ROLLING_STEP_STRATEGY_ID,
+            "ROLLING_ROUTE_STRATEGY_ID": ROLLING_ROUTE_STRATEGY_ID,
+            "ROLLING_ROUTE_BOUNDARY_PROFILE_IDS": client_module.ROLLING_ROUTE_BOUNDARY_PROFILE_IDS,
             "ROLLING_CONTROL_HISTORY_STRATEGY_ID": client_module.ROLLING_CONTROL_HISTORY_STRATEGY_ID,
             "replace": client_module.replace,
             "rolling_capture_boundary": rolling_capture_boundary,
@@ -770,6 +783,59 @@ class StepCaptureBlockTest(unittest.TestCase):
         self.assertEqual(client._rolling_analysis_anchor_state.tokens, HISTORY1 + GUIDE1)
         self.assertEqual(client._rolling_control_history_anchor_state.tokens, HISTORY1)
         self.assertFalse(client._rolling_step_anchor_state.valid, "the STEP slot is untouched")
+
+    ROUTE_PROMPT = HISTORY1 + [5] + GEN
+    ROUTE_BOUNDARY = HISTORY1 + [5]
+
+    def _route_run(self, *, profile_id, existing=None, prompt=None, processed=0):
+        prompt = prompt or self.ROUTE_PROMPT
+        return self._run(
+            ident=identity(ROLLING_ROUTE_STRATEGY_ID), head=None, prompt_tokens=prompt,
+            processed=processed, existing=existing, suffix=tokens_as_text(GEN),
+            profile_id=profile_id)
+
+    def test_a_boundary_profile_snapshots_the_route_before_the_generation_prompt(self) -> None:
+        """The 9B template drops the generation prompt's tail from history, so
+        a whole-prompt route checkpoint could never be extended."""
+        client, g, decoded, captured = self._route_run(profile_id=QWEN38_9B_DISTILL_PROFILE_ID)
+        self.assertTrue(g["route_boundary_lineage"])
+        self.assertEqual(g["capture_at"], len(self.ROUTE_BOUNDARY))
+        self.assertEqual(decoded[0], (0, len(self.ROUTE_BOUNDARY)), "prefill stops at the boundary first")
+        self.assertEqual(captured, [self.ROUTE_BOUNDARY], "the boundary, not the whole prompt")
+        self.assertEqual(client._rolling_route_anchor_state.tokens, self.ROUTE_BOUNDARY)
+
+    def test_every_other_route_profile_keeps_the_whole_prompt_capture(self) -> None:
+        for profile_id in (QWEN38_SALUKI_PROFILE_ID, QWEN38_FLASH_NEXT_PROFILE_ID, None):
+            with self.subTest(profile=profile_id):
+                client, g, decoded, captured = self._route_run(profile_id=profile_id)
+                self.assertFalse(g["route_boundary_lineage"])
+                self.assertIsNone(g["capture_at"])
+                self.assertEqual(decoded, [], "no boundary prefill: the whole prompt is decoded after")
+                self.assertEqual(captured, [])
+
+    def test_a_route_boundary_that_extends_the_stored_one_replaces_it(self) -> None:
+        stored = RollingRouteAnchorState(
+            identity=identity(ROLLING_ROUTE_STRATEGY_ID), tokens=list(self.ROUTE_BOUNDARY),
+            checkpoint_data=b"old", created_at_monotonic=1.0)
+        longer = self.ROUTE_BOUNDARY + [6, 7, 8]
+        client, g, _decoded, captured = self._route_run(
+            profile_id=QWEN38_9B_DISTILL_PROFILE_ID, existing=stored,
+            prompt=longer + GEN, processed=len(self.ROUTE_BOUNDARY))
+        self.assertEqual(captured, [longer])
+        self.assertEqual(client._rolling_route_anchor_state.tokens, longer)
+
+    def test_a_non_extending_route_boundary_keeps_the_older_one_and_records_the_miss(self) -> None:
+        stored = RollingRouteAnchorState(
+            identity=identity(ROLLING_ROUTE_STRATEGY_ID), tokens=list(self.ROUTE_BOUNDARY),
+            checkpoint_data=b"old", created_at_monotonic=1.0)
+        other = [70, 71, 72, 73, 74, 75]
+        client, g, _decoded, captured = self._route_run(
+            profile_id=QWEN38_9B_DISTILL_PROFILE_ID, existing=stored, prompt=other + GEN)
+        self.assertEqual(captured, [], "kept: the stored checkpoint is not discarded")
+        state = client._rolling_route_anchor_state
+        self.assertEqual(state.tokens, self.ROUTE_BOUNDARY)
+        self.assertEqual(state.non_extending_misses, 1)
+        self.assertEqual(state.last_miss_tokens, other)
 
     def test_a_later_control_turn_replaces_a_stale_control_checkpoint(self) -> None:
         """The Stage A repair reuse depends on this once STEPs stop evicting.

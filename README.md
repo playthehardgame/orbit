@@ -130,6 +130,13 @@ This list is not a performance ranking.
 A working model integration and valid tool calls do not establish that its
 explanations are correct.
 
+Qwen3.8 9B Distill Q4_K_M uses its own verified profile; CHAT route calls use
+the rolling route checkpoint, taken at the turn boundary because its template
+drops the generation prompt's tail from history, after a real-model state
+round-trip qualification. MTP and the fixed-head route prefix are not
+qualified; see the
+[checkpoint](docs/checkpoints/qwen38-9b-distill-qualification.md).
+
 Granite 4.2 3B and 8B use the verified native Granite 4.2 profile. Their
 qualified route-prefix reuse is enabled for the quantizations listed above;
 other Granite variants remain unsupported until separately verified.

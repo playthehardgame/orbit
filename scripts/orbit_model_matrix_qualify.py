@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Qualify every locally available registry model against the core fixture set.
+"""Qualify every locally available registry model against the matrix fixture set.
 
 For each model in the registry: if its target GGUF is not available locally the
 row is SKIPPED; otherwise an `orbit server --model-id <id>` is launched with the
@@ -40,7 +40,7 @@ for _path in (ROOT, SRC):
 PASS, FAIL, SKIPPED = "PASS", "FAIL", "SKIPPED"
 PARTIAL, NOT_COVERED = "PARTIAL", "NOT_COVERED"
 STATUSES = (PASS, PARTIAL, NOT_COVERED, FAIL, SKIPPED)
-DEFAULT_FIXTURES = ROOT / "qualification/fixtures/core-v1.json"
+DEFAULT_FIXTURES = ROOT / "qualification/fixtures/matrix-v1.json"
 
 
 @dataclass

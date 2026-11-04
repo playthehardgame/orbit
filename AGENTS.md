@@ -97,9 +97,12 @@ Three layers, cheapest first; none replaces ANALYSIS semantic qualification.
 - **Live qualification** (starts one real server per available model; slow):
   `python3 scripts/orbit_model_matrix_qualify.py [--model-id ID]`, tests in
   `tests/test_model_matrix_qualify.py` use fakes only. Statuses: PASS, PARTIAL
-  (some fixtures not applicable), NOT_COVERED (no `core-v1` fixture lists the
-  profile; today only Gemma 4 26B, Qwen3.6, Qwen3-Coder and Ornith are covered, so
-  the other models report NOT_COVERED, not FAIL), FAIL, SKIPPED. Exit 1 on FAIL,
+  (some fixtures not applicable), NOT_COVERED (no fixture lists the profile),
+  FAIL, SKIPPED. Default fixtures: `qualification/fixtures/matrix-v1.json`, the
+  four `core-v1` fixtures made applicable to all 15 verified profiles
+  (`core-v1` itself is frozen: its hash anchors historical evidence). Applicability
+  is not a qualification claim; a model that fails a fixture there is a finding to
+  investigate (for example `pwd_final` is known to fail on some profiles). Exit 1 on FAIL,
   3 when nothing was qualified (`--allow-empty` to accept). The driver applies one
   fixed ctx/threads/batch profile (CLI-overridable) and has never been run to
   completion against a real model.

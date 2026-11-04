@@ -12,6 +12,7 @@ files, is `scripts/orbit_model_matrix.py`.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import unittest
 
@@ -22,6 +23,7 @@ from orbit.native_llama.model_profiles import (
     verified_native_model_identity,
 )
 from orbit.native_llama.model_registry import load_registry
+from orbit.qualification.fixtures import load_fixture_set
 
 ROOT = Path(__file__).resolve().parents[1]
 README = (ROOT / "README.md").read_text(encoding="utf-8")
@@ -85,9 +87,19 @@ class ModelMatrixTests(unittest.TestCase):
     def test_readme_lists_every_registry_model(self) -> None:
         for manifest in self.manifests:
             with self.subTest(model=manifest.id):
+                rows = [
+                    line.split("|")[1]
+                    for line in README.splitlines()
+                    if line.startswith("|") and line.count("|") >= 3
+                ]
                 self.assertTrue(
-                    _squash(manifest.display_name) in _squash(README),
-                    f"README support table is missing {manifest.display_name!r}",
+                    any(
+                        _squash(row) in _squash(manifest.display_name)
+                        or _squash(manifest.display_name) in _squash(row)
+                        for row in rows
+                        if _squash(row) not in ("model", "")
+                    ),
+                    f"README support table has no row for {manifest.display_name!r}",
                 )
 
     def test_rolling_route_sets_are_nested_and_known(self) -> None:
@@ -103,14 +115,22 @@ class ModelMatrixTests(unittest.TestCase):
         )
 
     def test_boundary_profiles_have_a_checkpoint_document(self) -> None:
-        checkpoints = "\n".join(
+        docs = [
             p.read_text(encoding="utf-8") for p in (ROOT / "docs" / "checkpoints").glob("*.md")
-        )
+        ]
         for profile_id in native_client.ROLLING_ROUTE_BOUNDARY_PROFILE_IDS:
             with self.subTest(profile=profile_id):
-                self.assertIn("rolling route checkpoint", checkpoints.lower())
                 identity = self.identities[profile_id]
-                self.assertIn(identity.model_name.split()[0], checkpoints)
+                # One document must carry both the model's full name and its
+                # rolling-route qualification section, not just a stray word.
+                self.assertTrue(
+                    any(
+                        identity.model_name in doc
+                        and "rolling route checkpoint qualification" in doc.lower()
+                        for doc in docs
+                    ),
+                    f"no checkpoint document qualifies {identity.model_name!r}",
+                )
 
     def test_template_hash_constants_are_sha256_hex(self) -> None:
         for name, value in vars(model_profiles).items():
@@ -135,6 +155,36 @@ class ModelMatrixTests(unittest.TestCase):
                 continue
             with self.subTest(constant=name):
                 self.assertEqual(names.get(value), quant)
+
+
+class MatrixFixtureSetTests(unittest.TestCase):
+    """qualification/fixtures/matrix-v1.json must track core-v1 and the registry."""
+
+    def setUp(self) -> None:
+        self.core = json.loads((ROOT / "qualification/fixtures/core-v1.json").read_text())
+        self.matrix_path = ROOT / "qualification/fixtures/matrix-v1.json"
+        self.matrix = json.loads(self.matrix_path.read_text())
+
+    def test_matrix_fixture_set_loads(self) -> None:
+        load_fixture_set(str(self.matrix_path))
+
+    def test_matrix_covers_every_verified_profile_on_every_fixture(self) -> None:
+        expected = {i.profile_id for i in VERIFIED_NATIVE_MODEL_IDENTITIES}
+        for fixture in self.matrix["fixtures"]:
+            with self.subTest(fixture=fixture["name"]):
+                self.assertEqual(set(fixture["profiles"]), expected)
+                self.assertEqual(len(fixture["profiles"]), len(expected))
+
+    def test_matrix_differs_from_core_only_in_profiles(self) -> None:
+        def strip(data):
+            return [{k: v for k, v in f.items() if k != "profiles"} for f in data["fixtures"]]
+
+        self.assertEqual(strip(self.matrix), strip(self.core))
+        self.assertEqual(self.matrix["schema_version"], self.core["schema_version"])
+
+    def test_core_fixture_set_stays_frozen_to_its_four_profiles(self) -> None:
+        for fixture in self.core["fixtures"]:
+            self.assertEqual(len(fixture["profiles"]), 4)
 
 
 if __name__ == "__main__":

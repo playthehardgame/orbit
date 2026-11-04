@@ -107,6 +107,27 @@ Three layers, cheapest first; none replaces ANALYSIS semantic qualification.
   fixed ctx/threads/batch profile (CLI-overridable) and has never been run to
   completion against a real model.
 
+### Running the suite on a WSL2 host without the malware corpus
+
+Measured 2026-11-04 on this WSL2 machine: a bare `unittest discover` gives 162
+failures/errors, all environmental. With the two settings below the full suite is
+**6601 tests, 168 skipped, 2 failures** (the two corpus-presence gates, which fail
+loudly by design when `workdir/samples/` is empty); with the corpus waiver as well
+they pass. Do not read this as a code regression.
+
+```
+ORBIT_ANALYSIS_EXTRA_PROCESSES=128 ORBIT_ALLOW_MISSING_CORPUS=1 \
+  TMPDIR=/tmp PYTHONPATH=src python3 -m unittest discover -s tests -q
+```
+
+- `ORBIT_ANALYSIS_EXTRA_PROCESSES`: WSL2 owns tasks `/proc` does not show, so the
+  sandbox's NPROC ceiling undershoots and `bwrap` fails with "Creating new
+  namespace failed: Resource temporarily unavailable". 128 and 512 both clear it.
+- Tests that read a single frozen sample (`test_analysis_ole`, `_vba_eval`,
+  `_vba_autoexec`, `_fromcharcode`, `_finish_reference_ownership`) skip with an
+  explicit reason when the sample is absent. Their coverage is NOT proven on such a
+  host; the corpus-presence gates are what keep that visible.
+
 ## Historical machine-migration handoff (2026-09-13)
 
 The following migration record is retained as written. Its release, Git state,

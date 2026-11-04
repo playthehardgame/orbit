@@ -6,6 +6,7 @@ is a validation constant established by inspection of the extracted source.
 """
 from __future__ import annotations
 
+import os
 import unittest
 
 from orbit.runtime.analysis_vba_autoexec import (
@@ -17,6 +18,12 @@ from orbit.runtime.analysis_vba_autoexec import (
 )
 
 SAMPLE = "workdir/samples/99eb1d90eb5f0d012f35fcc2a7dedd2229312794354843637ebb7f40b74d0809.doc"
+
+
+requires_sample = unittest.skipUnless(
+    os.path.exists(SAMPLE),
+    "frozen corpus sample absent (populate workdir/samples/, see AGENTS.md)",
+)
 
 WORD_INV = [("WordDocument", 4096), ("Macros/VBA/ThisDocument", 100)]
 EXCEL_INV = [("Workbook", 4096), ("Macros/VBA/ThisWorkbook", 100)]
@@ -207,6 +214,7 @@ class NonSampleHardeningTests(unittest.TestCase):
             self.assertNotIn(forbidden, imported)
 
 
+@requires_sample
 class FrozenSampleTests(unittest.TestCase):
     def test_frozen_document_open_recognized(self):
         from orbit.runtime.analysis_ole import extract_office_vba
@@ -225,6 +233,7 @@ class FrozenSampleTests(unittest.TestCase):
         self.assertEqual(r.line, 256)
 
 
+@requires_sample
 class RuntimeIntegrationTests(unittest.TestCase):
     def _runtime(self, sample_bytes, name="in.doc"):
         import tempfile

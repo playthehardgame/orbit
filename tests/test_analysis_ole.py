@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import struct
+import os
 import unittest
 
 from orbit.runtime.analysis_ole import (
@@ -24,6 +25,12 @@ from orbit.runtime.analysis_ole import (
 )
 
 SAMPLE = "workdir/samples/99eb1d90eb5f0d012f35fcc2a7dedd2229312794354843637ebb7f40b74d0809.doc"
+
+
+requires_sample = unittest.skipUnless(
+    os.path.exists(SAMPLE),
+    "frozen corpus sample absent (populate workdir/samples/, see AGENTS.md)",
+)
 # Independently established (olevba) — validation expectation only.
 WITNESS_MODULE = "ThisDocument"
 WITNESS_SOURCE_SHA = "d034bd8381f4663af80a7f516cf104ae9fd2a49581379d6a7683bfdf1c8713f0"
@@ -79,6 +86,7 @@ class DecompressorTests(unittest.TestCase):
             decompress_vba(container, max_out=3000)  # outer per-chunk cap
 
 
+@requires_sample
 class ContainerRecognitionTests(unittest.TestCase):
     def test_non_ole_is_not_container(self):
         self.assertFalse(is_ole_container(b"var x=1;"))
@@ -97,6 +105,7 @@ class ContainerRecognitionTests(unittest.TestCase):
         self.assertIsNone(extract_office_vba(b"\x00" * 1024))
 
 
+@requires_sample
 class RealSampleExtractionTests(unittest.TestCase):
     def setUp(self):
         self.raw = open(SAMPLE, "rb").read()
@@ -127,6 +136,7 @@ class RealSampleExtractionTests(unittest.TestCase):
         self.assertEqual(m.codepage, 1252)
 
 
+@requires_sample
 class MalformedInputTests(unittest.TestCase):
     """Hostile mutations of the real container must fail closed, never crash the
     process, and never fabricate a module."""
@@ -221,6 +231,7 @@ class MalformedInputTests(unittest.TestCase):
             ole._read_sector(ole.max_sector + 100)
 
 
+@requires_sample
 class PreflightIntegrationTests(unittest.TestCase):
     """The Office preflight as ANALYSIS runs it: derived VBA evidence + a PLAN
     bootstrap, produced deterministically before any model call, without marking

@@ -1,5 +1,7 @@
 """FINISH citations are data; only structurally owned requests may retrieve."""
 import copy
+import os
+import unittest
 from dataclasses import replace
 from unittest import mock
 
@@ -304,6 +306,10 @@ class FinishReferenceOwnershipTests(_Case):
         self.assertEqual(rt.last_rehydration_diag['requested_ids'], [record.evidence_id])
         self.assertIn(stage.output, admitted[-1]['content'])
 
+    @unittest.skipUnless(
+        os.path.exists("workdir/samples/99eb1d90eb5f0d012f35fcc2a7dedd2229312794354843637ebb7f40b74d0809.doc"),
+        "frozen corpus sample absent (populate workdir/samples/, see AGENTS.md)",
+    )
     def test_owned_office_module_uses_existing_bounded_delivery(self):
         from pathlib import Path
         from tests.test_analysis_ole import PreflightIntegrationTests, SAMPLE

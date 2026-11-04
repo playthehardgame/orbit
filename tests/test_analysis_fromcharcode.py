@@ -15,6 +15,7 @@ statically unique, fails the whole call closed.
 from __future__ import annotations
 
 import hashlib
+import os
 import unittest
 
 from orbit.runtime.analysis_deobfuscate import (
@@ -292,6 +293,10 @@ class FromCharCodeIbanWitnessTests(unittest.TestCase):
 
     ORACLE_SHA = "5d51e7659955a754d55a83bce9157d8999864ee30a4f3cd5dc752ed0191a7de0"
 
+    @unittest.skipUnless(
+        os.path.exists("workdir/samples/IBAN.js"),
+        "frozen corpus sample absent (populate workdir/samples/, see AGENTS.md)",
+    )
     def test_iban_decodes_exactly(self):
         src = open("workdir/samples/IBAN.js", encoding="utf-8").read()
         stages = [

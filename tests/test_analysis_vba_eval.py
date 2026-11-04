@@ -10,6 +10,7 @@ by an independent witness.
 from __future__ import annotations
 
 import hashlib
+import os
 import unittest
 
 from orbit.runtime.analysis_deobfuscate import (
@@ -27,6 +28,12 @@ from orbit.runtime.analysis_vba_eval import (
 )
 
 SAMPLE = "workdir/samples/99eb1d90eb5f0d012f35fcc2a7dedd2229312794354843637ebb7f40b74d0809.doc"
+
+
+requires_sample = unittest.skipUnless(
+    os.path.exists(SAMPLE),
+    "frozen corpus sample absent (populate workdir/samples/, see AGENTS.md)",
+)
 # Independently established (hand witness) — validation expectation only.
 ORACLE_CMD_SHA = "f1fa67e3f558443e9604b0f0b26715dc8065c53c92db7acbab2e6d32874e5c21"
 ORACLE_URL = "http://185.189.58.222/x.exe"
@@ -495,6 +502,7 @@ class ReviewHardeningTests(unittest.TestCase):
         self.assertEqual(find_byte_offset_helpers(src), {})
 
 
+@requires_sample
 class FrozenSampleTransformTests(unittest.TestCase):
     def setUp(self):
         from orbit.runtime.analysis_ole import extract_office_vba
@@ -526,6 +534,7 @@ class FrozenSampleTransformTests(unittest.TestCase):
         self.assertTrue(deobfuscate_with_status(self.vba).complete)
 
 
+@requires_sample
 class RuntimeIntegrationTests(unittest.TestCase):
     """The transform must run over the EXTRACTED (decompressed) VBA source, not
     only the raw file bytes -- a real macro is MS-OVBA-compressed and never

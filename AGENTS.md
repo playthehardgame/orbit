@@ -83,6 +83,27 @@ These dispositions carry forward ORBIT-TODO-PRIORITY-AUDIT-1 and the subsequent
   classifiers and CPU MTP optimization without new evidence. Historical
   experiment recommendations below are not active NOW/NEXT tasks.
 
+### Model matrix (registry / profile / capability consistency)
+
+Three layers, cheapest first; none replaces ANALYSIS semantic qualification.
+
+- **Offline, every run** (`unittest discover`): `tests/test_model_matrix.py`
+  (registry, verified identities, rolling-route sets and README agree) and
+  `tests/test_model_capability_matrix.py` (per-profile detection, quantization,
+  mtp/route-prefix/multimodal/thinking flags and fail-closed drift, 15 profiles).
+  Adding a model means adding a row to both; they fail until you do.
+- **Live inspection** (needs the llama.cpp build, reads GGUF metadata, no
+  weights): `python3 scripts/orbit_model_matrix.py --build-bin <bin>`.
+- **Live qualification** (starts one real server per available model; slow):
+  `python3 scripts/orbit_model_matrix_qualify.py [--model-id ID]`, tests in
+  `tests/test_model_matrix_qualify.py` use fakes only. Statuses: PASS, PARTIAL
+  (some fixtures not applicable), NOT_COVERED (no `core-v1` fixture lists the
+  profile; today only Gemma 4 26B, Qwen3.6, Qwen3-Coder and Ornith are covered, so
+  the other models report NOT_COVERED, not FAIL), FAIL, SKIPPED. Exit 1 on FAIL,
+  3 when nothing was qualified (`--allow-empty` to accept). The driver applies one
+  fixed ctx/threads/batch profile (CLI-overridable) and has never been run to
+  completion against a real model.
+
 ## Historical machine-migration handoff (2026-09-13)
 
 The following migration record is retained as written. Its release, Git state,

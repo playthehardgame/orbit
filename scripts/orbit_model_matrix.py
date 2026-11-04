@@ -57,11 +57,11 @@ def main() -> int:
         print("native inspector unavailable: no GGUF was inspected", file=sys.stderr)
         return 2
 
-    by_name = {m.display_name: m for m in manifests}
+    by_id = {m.id: m for m in manifests}
     rows: list[dict[str, str]] = []
     failed = False
     for row in result.rows:
-        manifest = by_name.get(row.model)
+        manifest = by_id.get(row.model_id or "")
         if row.local != "AVAILABLE":
             status = "MISSING" if row.local == "MISSING" else row.local
             failed = failed or (args.require_all or row.local == "INCOMPLETE")

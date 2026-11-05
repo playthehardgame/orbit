@@ -1,0 +1,69 @@
+{
+  "c2_host": "synthetic.invalid",
+  "samples": {
+    "syn_fromcharcode.js": {
+      "expected_stage_kinds": [
+        "js_fromcharcode_offset"
+      ],
+      "expected_stage_output_sha256": [
+        "bef185eda3d67470d31f48455e3fefee947155740f0e17e00f97047b6a7bb750"
+      ],
+      "expected_stage_outputs": [
+        "WScript.Echo(\"orbit-synthetic-fromcharcode http://synthetic.invalid/stage\");"
+      ],
+      "sha256": "dd7a3414ec2b5095353573650c3a5228d7dcd50a6bba2901a9a2398bcc172313"
+    },
+    "syn_jscript_xor.js": {
+      "expected_stage_kinds": [
+        "jscript_numeric_xor"
+      ],
+      "expected_stage_output_sha256": [
+        "b6bfe5d204b455b6071a3bee100562b33c9b5c84304c9bf5f858848506049561"
+      ],
+      "expected_stage_outputs": [
+        "WScript.Echo(\"orbit-synthetic-jscript \" + \"http://synthetic.invalid/stage\");"
+      ],
+      "sha256": "0b4c62f5ad68efba05b79b6f0d140431ce9c9dcc11f315d742b9fd4fadf84946"
+    },
+    "syn_layered.vbs": {
+      "expected_stage_kinds": [
+        "vbscript_chr_offset",
+        "powershell_chr_offset"
+      ],
+      "expected_stage_output_sha256": [
+        "57d1225ac0741da64dd384f853a8600695e6f07c0adfb5ede2bb343448f1e67d",
+        "a7071df9bab2ee90842aca178049320d6f826d38ae3fd70f55bec78b1a440235"
+      ],
+      "expected_stage_outputs": [
+        "function dd($z){$h=500;foreach($p in $z){$o+=[char]($p - $h)}}\nx = dd @(611, 614, 598, 605, 616, 545, 615, 621, 610, 616, 604, 601, 616, 605, 599, 545, 605, 610, 610, 601, 614, 532, 604, 616, 616, 612, 558, 547, 547, 615, 621, 610, 616, 604, 601, 616, 605, 599, 546, 605, 610, 618, 597, 608, 605, 600, 547, 615, 616, 597, 603, 601)\n",
+        "orbit-synthetic-inner http://synthetic.invalid/stage"
+      ],
+      "sha256": "aa16a1c74b99de499d204c412f166ad98e3bce7e62e64f3fcd07ed6a74fdfa68"
+    },
+    "syn_powershell_xor.ps1": {
+      "expected_stage_kinds": [
+        "powershell_numeric_xor"
+      ],
+      "expected_stage_output_sha256": [
+        "82e44bd0a91d9678fb29c80fcf3f12d487aef717614438a9b0a7d30a1fa6875d"
+      ],
+      "expected_stage_outputs": [
+        "Write-Output 'orbit-synthetic-powershell http://synthetic.invalid/stage'"
+      ],
+      "sha256": "e20a9675d294a6766d013c2c291a2d7d566ac434df470fde49031936d6e81fc3"
+    },
+    "syn_vbscript_chr.vbs": {
+      "expected_stage_kinds": [
+        "vbscript_chr_offset"
+      ],
+      "expected_stage_output_sha256": [
+        "83c40cf747084235d68a2207ea25e8f41cc823b224f61eedc2db8ea169c546dd"
+      ],
+      "expected_stage_outputs": [
+        "WScript.Echo \"orbit-synthetic-vbscript http://synthetic.invalid/stage\""
+      ],
+      "sha256": "3d09266020402b20c6027f676462411d06562f47f2ad281d89808ccf1035a6b4"
+    }
+  },
+  "schema_version": 1
+}

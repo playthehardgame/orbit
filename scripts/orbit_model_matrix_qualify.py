@@ -156,16 +156,24 @@ def run_qualification(base_url: str, profile_id: str, server_pid: int | None,
             workdir=Path(workdir),
         ).run(None)
     write_result(run, str(output_path))
+    status, coverage = classify_run(run)
+    return {"status": status, "summary": format_summary(run), "coverage": coverage}
+
+
+def classify_run(run) -> tuple[str, str]:
+    """Map a QualificationRun to (row status, 'applicable/total' coverage)."""
+    from orbit.qualification.schema import Status
+
     total = len(run.fixtures)
     applicable = sum(1 for item in run.fixtures if getattr(item, "applicable", True))
     if run.overall_status is Status.PASS:
-        status = PASS if applicable == total else PARTIAL
+        # A PASS with no applicable fixture covers nothing: never report it as PASS.
+        status = PASS if applicable == total and total else (PARTIAL if applicable else NOT_COVERED)
     elif run.overall_status is Status.NOT_APPLICABLE:
         status = NOT_COVERED
     else:
         status = FAIL
-    return {"status": status, "summary": format_summary(run),
-            "coverage": f"{applicable}/{total}"}
+    return status, f"{applicable}/{total}"
 
 
 def model_available(manifest, cfg: MatrixConfig) -> Path | None:
@@ -256,10 +264,10 @@ def run_matrix(manifests: Sequence, cfg: MatrixConfig, *, on_row: Callable | Non
 def format_table(report: dict[str, Any]) -> str:
     rows = report["models"]
     width = max([len("MODEL")] + [len(r["model_id"]) for r in rows])
-    lines = [f"{'MODEL'.ljust(width)}  {'STATUS':<8}  {'WALL_S':>8}  DETAIL"]
+    lines = [f"{'MODEL'.ljust(width)}  {'STATUS':<11}  {'WALL_S':>8}  DETAIL"]
     for r in rows:
         detail = (r["detail"].strip().splitlines() or [""])[0][:100]
-        lines.append(f"{r['model_id'].ljust(width)}  {r['status']:<8}  {r['wall_seconds']:>8.1f}  {detail}")
+        lines.append(f"{r['model_id'].ljust(width)}  {r['status']:<11}  {r['wall_seconds']:>8.1f}  {detail}")
     c = report["counts"]
     lines.append(" ".join(f"{s}={c[s]}" for s in STATUSES) + f" overall={report['overall']}")
     return "\n".join(lines)
@@ -293,7 +301,16 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None, *, manifests: Sequence | None = None, **hooks) -> int:
-    a = _parser().parse_args(argv)
+    parser = _parser()
+    a = parser.parse_args(argv)
+    for flag in ("ctx", "threads", "threads_batch", "batch", "ubatch", "startup_timeout", "request_timeout"):
+        if getattr(a, flag) <= 0:
+            parser.error(f"--{flag.replace('_', '-')} must be positive")
+    if not a.fixtures.is_file():
+        # Fail before any server is started: a bad path would otherwise cost one
+        # full model load per row and then fail every row at fixture load time.
+        print(f"fixture set not found: {a.fixtures}", file=sys.stderr)
+        return 2
     cfg = MatrixConfig(ctx=a.ctx, threads=a.threads, threads_batch=a.threads_batch, batch=a.batch,
                        ubatch=a.ubatch, startup_timeout=a.startup_timeout,
                        request_timeout=a.request_timeout, models_dir=a.models_dir,

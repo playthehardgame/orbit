@@ -228,6 +228,274 @@ class MatrixQualifyTests(unittest.TestCase):
         with mock.patch("orbit.native_llama.model_registry.resolve_model", return_value=resolved):
             self.assertEqual(mq.model_available(manifest("a"), mq.MatrixConfig()), target)
 
+    # ---- gap tests -------------------------------------------------------
+
+    def run_main(self, argv, ids=("a",), harness=None, **override):
+        h = harness or Harness(present=set(ids))
+        hooks = h.hooks()
+        hooks.update(override)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        code = mq.main(["--output-dir", self.tmp.name, *argv], manifests=[manifest(i) for i in ids], **hooks)
+        path = Path(self.tmp.name) / "matrix.json"
+        return code, (json.loads(path.read_text()) if path.exists() else None), h
+
+    def test_launch_failure_fails_row_without_stop_and_continues(self):
+        h = Harness(present={"a", "b"})
+        def launch(model_id, port, cfg, log):
+            if model_id == "a":
+                raise FileNotFoundError("no python")
+            return FakeProcess()
+        code, report, _ = self.run_main([], ids=("a", "b"), harness=h, launch=launch)
+        self.assertEqual(code, 1)
+        self.assertEqual([r["status"] for r in report["models"]], ["FAIL", "PASS"])
+        self.assertIn("FileNotFoundError", report["models"][0]["detail"])
+        self.assertEqual(len(h.stopped), 1)
+
+    def test_stop_failure_marks_row_fail_and_keeps_detail(self):
+        def stop(process):
+            raise OSError("cannot kill")
+        code, report, _ = self.run_main([], stop=stop)
+        row = report["models"][0]
+        self.assertEqual((code, row["status"]), (1, "FAIL"))
+        self.assertIn("stop failed: cannot kill", row["detail"])
+
+    def test_interrupt_during_health_wait_stops_server_and_writes_report(self):
+        h = Harness(present={"a", "b"}, health_error=KeyboardInterrupt())
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        with self.assertRaises(KeyboardInterrupt):
+            mq.main(["--output-dir", self.tmp.name], manifests=[manifest("a"), manifest("b")], **h.hooks())
+        self.assertEqual(h.launched, ["a"])
+        self.assertEqual(len(h.stopped), 1)
+        report = json.loads((Path(self.tmp.name) / "matrix.json").read_text())
+        self.assertEqual(report["models"][-1]["detail"], "interrupted")
+        self.assertEqual(report["overall"], "FAIL")
+
+    def test_sigterm_handler_is_installed_during_run_and_restored(self):
+        before = signal.getsignal(signal.SIGTERM)
+        seen = []
+        h = Harness(present={"a"})
+        hooks = h.hooks()
+        def wait(url, process, timeout, log):
+            seen.append(signal.getsignal(signal.SIGTERM))
+        hooks["wait_health"] = wait
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        mq.main(["--output-dir", self.tmp.name], manifests=[manifest("a")], **hooks)
+        self.assertIs(seen[0], mq._raise_interrupt)
+        self.assertEqual(signal.getsignal(signal.SIGTERM), before)
+        with self.assertRaises(KeyboardInterrupt):
+            mq._raise_interrupt(signal.SIGTERM, None)
+
+    def test_sigterm_handler_restored_after_interrupt(self):
+        before = signal.getsignal(signal.SIGTERM)
+        h = Harness(present={"a"}, run_error=KeyboardInterrupt())
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        with self.assertRaises(KeyboardInterrupt):
+            mq.main(["--output-dir", self.tmp.name], manifests=[manifest("a")], **h.hooks())
+        self.assertEqual(signal.getsignal(signal.SIGTERM), before)
+
+    def test_cli_overrides_reach_launch_config(self):
+        captured = []
+        h = Harness(present={"a"})
+        def launch(model_id, port, cfg, log):
+            captured.append(cfg)
+            return FakeProcess()
+        self.run_main(["--ctx", "4096", "--threads", "2", "--threads-batch", "3", "--batch", "64",
+                       "--ubatch", "32", "--startup-timeout", "7", "--request-timeout", "9",
+                       "--models-dir", "/md", "--fixtures", str(mq.DEFAULT_FIXTURES)],
+                      harness=h, launch=launch)
+        cfg = captured[0]
+        self.assertEqual((cfg.ctx, cfg.threads, cfg.threads_batch, cfg.batch, cfg.ubatch),
+                         (4096, 2, 3, 64, 32))
+        self.assertEqual((cfg.startup_timeout, cfg.request_timeout), (7.0, 9.0))
+        self.assertEqual(cfg.models_dir, Path("/md"))
+        cmd = mq.server_command("a", 1, cfg)
+        self.assertEqual(cmd[cmd.index("--ctx") + 1], "4096")
+        self.assertEqual(cmd[cmd.index("--models-dir") + 1], "/md")
+
+    def test_nonpositive_numeric_overrides_are_rejected_before_any_launch(self):
+        for flag in ("--ctx", "--threads", "--batch", "--ubatch", "--startup-timeout", "--request-timeout"):
+            with self.subTest(flag=flag):
+                h = Harness(present={"a"})
+                with mock.patch("sys.stderr"), self.assertRaises(SystemExit) as ctx:
+                    self.run_main([flag, "0"], harness=h)
+                self.assertEqual(ctx.exception.code, 2)
+                self.assertEqual(h.launched, [])
+
+    def test_missing_fixture_file_exits_2_before_launching_servers(self):
+        h = Harness(present={"a"})
+        with mock.patch("sys.stderr"):
+            code, report, _ = self.run_main(["--fixtures", "/nonexistent/fixtures.json"], harness=h)
+        self.assertEqual(code, 2)
+        self.assertEqual(h.launched, [])
+        self.assertIsNone(report)
+
+    def test_model_id_filter_dedups_and_preserves_registry_order(self):
+        h = Harness(present={"a", "b", "c"})
+        code, report, _ = self.run_main(["--model-id", "c", "--model-id", "a", "--model-id", "c"],
+                                        ids=("a", "b", "c"), harness=h)
+        self.assertEqual(h.launched, ["a", "c"])
+        self.assertEqual([r["model_id"] for r in report["models"]], ["a", "c"])
+
+    def test_unknown_model_id_among_valid_ones_exits_2(self):
+        h = Harness(present={"a"})
+        with mock.patch("sys.stderr"):
+            code, _, _ = self.run_main(["--model-id", "a", "--model-id", "zzz"], harness=h)
+        self.assertEqual((code, h.launched), (2, []))
+
+    def test_empty_registry_is_not_a_green_run(self):
+        code, report, _ = self.run_main([], ids=())
+        self.assertEqual((code, report["overall"], report["models"]), (3, "NOT_COVERED", []))
+        code, _, _ = self.run_main(["--allow-empty"], ids=())
+        self.assertEqual(code, 0)
+
+    def test_status_matrix_exit_codes(self):
+        # PARTIAL alone qualifies a model: exit 0; PARTIAL + SKIPPED too.
+        for ids, present in (("a", {"a"}), (("a", "b"), {"a"})):
+            with self.subTest(ids=ids):
+                ids = (ids,) if isinstance(ids, str) else ids
+                code, report, _ = self.run_main([], ids=ids, harness=Harness(present=present, run_status="PARTIAL"))
+                self.assertEqual((code, report["overall"]), (0, "PASS"))
+        # NOT_COVERED + SKIPPED only: exit 3, but allowed with the flag.
+        code, report, _ = self.run_main([], ids=("a", "b"), harness=Harness(present={"a"}, run_status="NOT_COVERED"))
+        self.assertEqual((code, report["overall"]), (3, "NOT_COVERED"))
+        code, _, _ = self.run_main(["--allow-empty"], ids=("a", "b"),
+                                   harness=Harness(present={"a"}, run_status="NOT_COVERED"))
+        self.assertEqual(code, 0)
+
+    def test_fail_beats_empty_and_allow_empty(self):
+        code, report, _ = self.run_main(["--allow-empty"], harness=Harness(present={"a"}, run_status="FAIL"))
+        self.assertEqual((code, report["overall"]), (1, "FAIL"))
+
+    def test_fail_row_alongside_pass_is_overall_fail(self):
+        h = Harness(present={"a", "b"})
+        def run(url, profile_id, pid, cfg, out):
+            return {"status": "FAIL" if profile_id == "profile-b" else "PASS", "summary": "", "coverage": "1/1"}
+        code, report, _ = self.run_main([], ids=("a", "b"), harness=h, run=run)
+        self.assertEqual((code, report["overall"], report["counts"]["PASS"], report["counts"]["FAIL"]),
+                         (1, "FAIL", 1, 1))
+
+    def test_result_without_status_or_non_dict_is_fail(self):
+        for result in ({}, {"status": None}):
+            with self.subTest(result=result):
+                code, report, _ = self.run_main([], run=lambda *a, **k: result)
+                self.assertEqual((code, report["models"][0]["status"]), (1, "FAIL"))
+        code, report, _ = self.run_main([], run=lambda *a, **k: None)
+        self.assertEqual((code, report["models"][0]["status"]), (1, "FAIL"))
+        self.assertIn("AttributeError", report["models"][0]["detail"])
+
+    def test_skipped_row_has_no_path_or_result_path_and_no_server(self):
+        h = Harness()
+        _, report, _ = self.run_main([], ids=("a",), harness=h)
+        row = report["models"][0]
+        self.assertNotIn("result_path", row)
+        self.assertNotIn("path", row)
+        self.assertEqual((h.launched, h.stopped), ([], []))
+        self.assertEqual(row["detail"], "model not available locally")
+
+    def test_report_written_after_each_row(self):
+        snapshots = []
+        h = Harness(present={"a", "b"})
+        hooks = h.hooks()
+        orig = hooks["run"]
+        def run(*args):
+            path = Path(self.tmp.name) / "matrix.json"
+            snapshots.append(len(json.loads(path.read_text())["models"]) if path.exists() else 0)
+            return orig(*args)
+        hooks["run"] = run
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        mq.main(["--output-dir", self.tmp.name], manifests=[manifest("a"), manifest("b")], **hooks)
+        self.assertEqual(snapshots, [0, 1])
+
+    def test_format_table_uses_first_detail_line_and_tolerates_empty(self):
+        report = mq.build_report(mq.MatrixConfig(), [
+            {"model_id": "a", "display_name": "", "status": "FAIL", "detail": "line1\nline2", "wall_seconds": 1.0},
+            {"model_id": "b", "display_name": "", "status": "SKIPPED", "detail": "", "wall_seconds": 0.0},
+        ])
+        text = mq.format_table(report)
+        self.assertIn("line1", text)
+        self.assertNotIn("line2", text)
+        self.assertIn("overall=NOT_COVERED", mq.format_table(mq.build_report(mq.MatrixConfig(), [])))
+
+    def test_model_available_propagates_non_missing_errors_to_a_fail_row(self):
+        with mock.patch("orbit.native_llama.model_registry.resolve_model", side_effect=FileNotFoundError("x")):
+            self.assertIsNone(mq.model_available(manifest("a"), mq.MatrixConfig()))
+        with mock.patch("orbit.native_llama.model_registry.resolve_model", side_effect=ValueError("corrupt")):
+            with self.assertRaises(ValueError):
+                mq.model_available(manifest("a"), mq.MatrixConfig())
+            row = mq.qualify_model(manifest("a"), mq.MatrixConfig(), available=mq.model_available,
+                                   launch=None, wait_health=None, run=None, stop=None)
+        self.assertEqual(row["status"], "FAIL")
+        self.assertIn("ValueError", row["detail"])
+
+    def test_classify_run_status_mapping(self):
+        from orbit.qualification.schema import Status
+        def run(overall, flags):
+            return SimpleNamespace(overall_status=overall, fixtures=[SimpleNamespace(applicable=f) for f in flags])
+        self.assertEqual(mq.classify_run(run(Status.PASS, [True, True])), ("PASS", "2/2"))
+        self.assertEqual(mq.classify_run(run(Status.PASS, [True, False])), ("PARTIAL", "1/2"))
+        self.assertEqual(mq.classify_run(run(Status.PASS, [False, False])), ("NOT_COVERED", "0/2"))
+        self.assertEqual(mq.classify_run(run(Status.PASS, [])), ("NOT_COVERED", "0/0"))
+        self.assertEqual(mq.classify_run(run(Status.NOT_APPLICABLE, [False])), ("NOT_COVERED", "0/1"))
+        self.assertEqual(mq.classify_run(run(Status.FAIL, [True])), ("FAIL", "1/1"))
+        self.assertEqual(mq.classify_run(run(Status.TECHNICAL_STOP, [True])), ("FAIL", "1/1"))
+
+    def test_wait_for_health_detects_dead_server_and_times_out(self):
+        class Backend:
+            def __init__(self, **_): pass
+            def health(self): return False
+        log = Path(tempfile.gettempdir()) / "orbit-matrix-test-health.log"
+        log.write_text("boom: bad gguf", encoding="utf-8")
+        self.addCleanup(lambda: log.unlink(missing_ok=True))
+        dead = SimpleNamespace(poll=lambda: 1)
+        alive = SimpleNamespace(poll=lambda: None)
+        with mock.patch("orbit.backend.llama_server.LlamaServerBackend", Backend):
+            with self.assertRaisesRegex(RuntimeError, "exited during startup: boom"):
+                mq.wait_for_health("http://x", dead, 5, log)
+            with mock.patch.object(mq.time, "sleep"):
+                with self.assertRaises(TimeoutError):
+                    mq.wait_for_health("http://x", alive, 0.01, log)
+        class Ready(Backend):
+            def health(self): return True
+        with mock.patch("orbit.backend.llama_server.LlamaServerBackend", Ready):
+            mq.wait_for_health("http://x", alive, 5, log)
+
+    def test_launch_server_isolates_session_and_disables_prewarm(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(mq.subprocess, "Popen") as popen:
+            mq.launch_server("a", 99, mq.MatrixConfig(), Path(d) / "s.log")
+        kwargs = popen.call_args.kwargs
+        self.assertTrue(kwargs["start_new_session"])
+        self.assertEqual(kwargs["env"]["ORBIT_KV_PREFIX_PREWARM"], "off")
+        self.assertEqual(kwargs["stderr"], mq.subprocess.STDOUT)
+
+    def test_stop_server_noop_when_exited_and_falls_back_when_killpg_fails(self):
+        with mock.patch.object(mq.os, "killpg") as killpg:
+            mq.stop_server(SimpleNamespace(poll=lambda: 0))
+        killpg.assert_not_called()
+        proc = mock.Mock(pid=5)
+        proc.poll.return_value = None
+        with mock.patch.object(mq.os, "killpg", side_effect=ProcessLookupError):
+            mq.stop_server(proc)
+        proc.terminate.assert_called_once()
+
+    def test_log_file_is_removed_even_on_failure(self):
+        logs = []
+        h = Harness(present={"a"}, health_error=RuntimeError("x"))
+        hooks = h.hooks()
+        orig = hooks["launch"]
+        def launch(model_id, port, cfg, log):
+            logs.append(log)
+            return orig(model_id, port, cfg, log)
+        hooks["launch"] = launch
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        mq.main(["--output-dir", self.tmp.name], manifests=[manifest("a")], **hooks)
+        self.assertFalse(logs[0].exists())
+
 
 if __name__ == "__main__":
     unittest.main()

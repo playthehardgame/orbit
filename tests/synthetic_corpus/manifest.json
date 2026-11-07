@@ -40,6 +40,22 @@
       ],
       "sha256": "aa16a1c74b99de499d204c412f166ad98e3bce7e62e64f3fcd07ed6a74fdfa68"
     },
+    "syn_macro.doc": {
+      "container": "ole2-cfb",
+      "expected_module_name": "ThisDocument",
+      "expected_module_source": "Attribute VB_Name = \"ThisDocument\"\r\nFunction dec(ByVal a)\r\n    Dim k\r\n    k = 311\r\n    For Each e In a\r\n        s = s & Chr(e - k)\r\n    Next\r\n    dec = s\r\nEnd Function\r\nSub AutoOpen()\r\n    x = dec(Array(379, 412, 409, 428, 414, 357, 391, 425, 416, 421, 427, 343, 345, 422, 425, 409, 416, 427, 356, 426, 432, 421, 427, 415, 412, 427, 416, 410, 356, 420, 408, 410, 425, 422, 343, 415, 427, 427, 423, 369, 358, 358, 426, 432, 421, 427, 415, 412, 427, 416, 410, 357, 416, 421, 429, 408, 419, 416, 411, 358, 426, 427, 408, 414, 412, 345))\r\nEnd Sub\r\n",
+      "expected_module_source_sha256": "9dc3c6fca7f934ee06af43890cb9d32bd7d568fdecc0d180f00f20f4f7e92b69",
+      "expected_stage_kinds": [
+        "vbscript_chr_offset"
+      ],
+      "expected_stage_output_sha256": [
+        "e05993863f71ad2705d13083d594437f4fce3e03d80afee34eeec6e28d2e9e92"
+      ],
+      "expected_stage_outputs": [
+        "Debug.Print \"orbit-synthetic-macro http://synthetic.invalid/stage\""
+      ],
+      "sha256": "7a263e371b427f421ac12f576e37cce9c847654edc8d88bfdf881c71a2e14c6e"
+    },
     "syn_powershell_xor.ps1": {
       "expected_stage_kinds": [
         "powershell_numeric_xor"
@@ -51,6 +67,18 @@
         "Write-Output 'orbit-synthetic-powershell http://synthetic.invalid/stage'"
       ],
       "sha256": "e20a9675d294a6766d013c2c291a2d7d566ac434df470fde49031936d6e81fc3"
+    },
+    "syn_stringarray.js": {
+      "expected_stage_kinds": [
+        "js_stringarray_fold"
+      ],
+      "expected_stage_output_sha256": [
+        "7e8af9458da95556b9858a741befc109b7ebb94095e8f5f34f951944c97338a0"
+      ],
+      "expected_stage_outputs": [
+        "orbit-synthetic-stringarray http://synthetic.invalid/stage"
+      ],
+      "sha256": "2de7c2281edb34604fb981923fdf0cce12630b1bbe643588590ae4198216a11a"
     },
     "syn_vbscript_chr.vbs": {
       "expected_stage_kinds": [

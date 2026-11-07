@@ -23,12 +23,19 @@ sys.path.insert(0, str(CORPUS))
 import generate  # noqa: E402
 
 from orbit.runtime.analysis_deobfuscate import COMPLETE, deobfuscate_with_status  # noqa: E402
+from orbit.runtime.analysis_ole import extract_office_vba, is_ole_container  # noqa: E402
 
 MANIFEST = json.loads((CORPUS / "manifest.json").read_text(encoding="utf-8"))
 URL = re.compile(r"https?://([A-Za-z0-9.\-]+)")
 
 
 def _text(name: str) -> str:
+    """The text the analyzers see: the file itself, or for the OLE container the
+    VBA module source extracted by the production OLE reader."""
+    if name.endswith(".doc"):
+        ex = extract_office_vba((CORPUS / name).read_bytes())
+        assert ex is not None and len(ex.modules) == 1, "macro sample must yield one module"
+        return ex.modules[0].source
     return (CORPUS / name).read_text(encoding="utf-8")
 
 
@@ -42,7 +49,8 @@ class SyntheticCorpusTests(unittest.TestCase):
         for name, (source, entry) in generate.build().items():
             with self.subTest(sample=name):
                 data = (CORPUS / name).read_bytes()
-                self.assertEqual(data, source.encode("utf-8"), "regenerate the corpus")
+                expected = source if isinstance(source, bytes) else source.encode("utf-8")
+                self.assertEqual(data, expected, "regenerate the corpus")
                 self.assertEqual(hashlib.sha256(data).hexdigest(), entry["sha256"])
                 self.assertEqual(MANIFEST["samples"][name], entry)
 
@@ -79,6 +87,25 @@ class SyntheticCorpusTests(unittest.TestCase):
         innermost = entry["expected_stage_outputs"][-1]
         result = deobfuscate_with_status(_text("syn_layered.vbs"))
         self.assertIn(innermost, [s.output for s in result.stages])
+
+    def test_the_macro_container_yields_its_independent_module_oracle(self) -> None:
+        entry = MANIFEST["samples"]["syn_macro.doc"]
+        raw = (CORPUS / "syn_macro.doc").read_bytes()
+        self.assertTrue(is_ole_container(raw))
+        ex = extract_office_vba(raw)
+        self.assertIsNotNone(ex)
+        self.assertEqual([m.name for m in ex.modules], [entry["expected_module_name"]])
+        module = ex.modules[0]
+        self.assertEqual(module.source, entry["expected_module_source"])
+        self.assertEqual(module.source_sha256, entry["expected_module_source_sha256"])
+        self.assertEqual(module.stream_path, "VBA/" + entry["expected_module_name"])
+
+    def test_the_stringarray_sample_folds_the_joined_chunks(self) -> None:
+        entry = MANIFEST["samples"]["syn_stringarray.js"]
+        self.assertEqual(entry["expected_stage_kinds"], ["js_stringarray_fold"])
+        result = deobfuscate_with_status(_text("syn_stringarray.js"))
+        folds = [s.output for s in result.stages if s.kind == "js_stringarray_fold"]
+        self.assertEqual(folds, entry["expected_stage_outputs"])
 
     def test_corpus_is_harmless_only_invalid_hosts_anywhere(self) -> None:
         """Samples and every decoded layer reference only the `.invalid` TLD."""

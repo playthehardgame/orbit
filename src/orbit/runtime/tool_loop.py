@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+from orbit import telemetry
 from dataclasses import replace
 from pathlib import Path
 from typing import Callable
@@ -104,6 +105,7 @@ FILE_RECOVERY_TOOL_CALL_MAX_TOKENS = 64
 MAX_SHELL_REPAIR_RETRIES = 2
 
 
+@telemetry.traced("orbit.runtime.tool_loop")
 def run_tool_loop(
     runtime,
     *,

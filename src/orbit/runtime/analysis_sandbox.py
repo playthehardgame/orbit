@@ -27,6 +27,7 @@ deliberate act by a caller that already decided code execution is warranted.
 from __future__ import annotations
 
 import ast
+import functools
 import hashlib
 import os
 import selectors
@@ -39,6 +40,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from orbit import telemetry
 from orbit.runtime.analysis_tools_shim import ORBIT_TOOLS_SOURCE, MAX_READ_BYTES
 
 BWRAP = "/usr/bin/bwrap"
@@ -462,6 +464,30 @@ def _capture_artifacts(
     return tuple(captured)
 
 
+def _telemetry_execute(fn):
+    """Span + metrics around the sandbox run; same contract and signature."""
+
+    @functools.wraps(fn)
+    def wrapper(**kwargs):
+        with telemetry.span("orbit.analysis.sandbox_execute") as sp:
+            result = fn(**kwargs)
+            sp.set_attributes(
+                {
+                    "orbit.status": result.status,
+                    "orbit.exit_code": result.exit_status,
+                    "orbit.duration_s": result.duration_seconds,
+                    "orbit.input_sha256": result.input_sha256,
+                    "orbit.code_sha256": result.code_sha256,
+                    "orbit.count": len(result.artifacts),
+                }
+            )
+            telemetry.count("orbit.analysis.sandbox_runs", **{"orbit.status": result.status})
+            return result
+
+    return wrapper
+
+
+@_telemetry_execute
 def execute_analysis(
     *,
     source_path: Path | str,

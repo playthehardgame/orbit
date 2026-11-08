@@ -9,6 +9,8 @@ from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from orbit import telemetry
+
 from .base import (
     ChatResult,
     Message,
@@ -25,6 +27,7 @@ from .payloads import (
     ChatPayloadOptions,
     build_chat_payload,
 )
+from orbit import telemetry
 from orbit.final_prefix_config import resolve_final_prefix_reuse
 from orbit.native_llama.qwen_route_prefix import resolve_qwen_route_prefix_reuse
 from orbit.native_llama.qwen36_shell_tool_prefix import (
@@ -272,11 +275,15 @@ class LlamaServerBackend:
         )
 
     def health(self) -> bool:
-        try:
-            data = self._get_json("/health")
-        except LlamaServerError:
-            return False
-        return data.get("status") == "ok"
+        with telemetry.span("orbit.server.health") as sp:
+            try:
+                data = self._get_json("/health")
+            except LlamaServerError:
+                sp.set_attribute("orbit.status", "unreachable")
+                return False
+            ok = data.get("status") == "ok"
+            sp.set_attribute("orbit.status", "ok" if ok else "unhealthy")
+            return ok
 
     def model_info(self) -> ModelInfo | None:
         if self._model_info_cache is not None:
@@ -513,6 +520,33 @@ class LlamaServerBackend:
         return displayed
 
     def _observe_call(self, call: Callable[[], ChatResult]) -> ChatResult:
+        if not telemetry.enabled():
+            return self._observe_call_inner(call)
+        started = time.monotonic()
+        with telemetry.span("orbit.model.request", **{"orbit.operation": "chat"}) as sp:
+            result = self._observe_call_inner(call)
+            latency_ms = (time.monotonic() - started) * 1000.0
+            attrs = {
+                "orbit.tokens.prompt": result.prompt_tokens,
+                "orbit.tokens.completion": result.completion_tokens,
+                "orbit.tokens.cached": result.cached_tokens,
+                "orbit.finish_reason": result.finish_reason,
+                "orbit.tool_calls.count": len(result.tool_calls or ()),
+                "orbit.latency_ms": latency_ms,
+                "orbit.ttft_ms": result.stream_ttft_ms,
+                "orbit.tokens_per_second.prompt": result.prompt_tokens_per_second,
+                "orbit.tokens_per_second.generation": result.generation_tokens_per_second,
+            }
+            sp.set_attributes(attrs)
+            telemetry.count("orbit.model.requests")
+            telemetry.record("orbit.model.request.duration_ms", latency_ms)
+            if result.prompt_tokens:
+                telemetry.count("orbit.model.tokens.prompt", result.prompt_tokens)
+            if result.completion_tokens:
+                telemetry.count("orbit.model.tokens.completion", result.completion_tokens)
+            return result
+
+    def _observe_call_inner(self, call: Callable[[], ChatResult]) -> ChatResult:
         try:
             result = call()
         except StreamConsumerAbort as abort:

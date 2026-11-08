@@ -11,6 +11,7 @@ import re
 import time
 from http.client import IncompleteRead, RemoteDisconnected
 from typing import Callable
+from orbit import telemetry
 
 from orbit.native_llama.gguf_split import parse_split_name, shard_header_problems, validate_split_set
 from orbit.native_llama.model_registry import (
@@ -180,6 +181,25 @@ class _TransferInterrupted(DownloadIncomplete):
 
 
 def fetch_resumable(url: str, destination: Path, *, opener=None, progress: DownloadProgress | None = None,
+                    chunk_size: int = _CHUNK) -> Path:
+    """Telemetry wrapper around :func:`_fetch_resumable` (same contract)."""
+    with telemetry.span("orbit.download.fetch") as sp:
+        part = _part_path(destination)
+        try:
+            resumed = part.exists() and part.stat().st_size > 0
+        except OSError:
+            resumed = False
+        sp.set_attribute("orbit.resumed", resumed)
+        result = _fetch_resumable(url, destination, opener=opener, progress=progress, chunk_size=chunk_size)
+        try:
+            sp.set_attribute("orbit.bytes", destination.stat().st_size)
+        except OSError:
+            pass
+        telemetry.count("orbit.download.completed")
+        return result
+
+
+def _fetch_resumable(url: str, destination: Path, *, opener=None, progress: DownloadProgress | None = None,
                     chunk_size: int = _CHUNK) -> Path:
     """One locked, persistent .part for single files and shards.
 

@@ -15,6 +15,7 @@ import threading
 import time
 from typing import Any, Mapping
 
+from orbit import telemetry
 from orbit.build_identity import PROCESS_BUILD_IDENTITY
 from orbit.backend.payloads import ARTIFACT_CONTENT_PROTOCOL_ID, ARTIFACT_CONTENT_PROTOCOL_VERSION
 from orbit.final_prefix_config import resolve_final_prefix_reuse
@@ -138,6 +139,9 @@ def _progress_payload(progress: Any, *, session_id: str) -> dict[str, Any]:
         if value is not None:
             payload[field] = value
     return payload
+
+
+_TELEMETRY_ENDPOINTS = frozenset({"/health", "/v1/models", "/props", "/tools", "/sessions", "/tokens/count", "/chat", "/chat/continue", "/chat/stream", "/chat/continue/stream", "/cancel", "/session/reset", "/v1/chat/completions", "/diagnostics/expert-usage", "/diagnostics/expert-usage/reset"})
 
 
 class OrbitNativeServer:
@@ -552,7 +556,21 @@ class OrbitNativeServer:
 class OrbitNativeHandler(BaseHTTPRequestHandler):
     server_version = "orbit-server"
 
+    def _telemetry_request(self, method: str):
+        endpoint = self.path.split("?", 1)[0]
+        if endpoint not in _TELEMETRY_ENDPOINTS:
+            endpoint = "other"
+        return telemetry.span("orbit.server.request", **{"orbit.operation": method, "orbit.endpoint": endpoint.strip("/").replace("/", ".") or "root"})
+
     def do_GET(self) -> None:
+        with self._telemetry_request("GET"):
+            self._do_get()
+
+    def do_POST(self) -> None:
+        with self._telemetry_request("POST"):
+            self._do_post()
+
+    def _do_get(self) -> None:
         self._request_started = time.monotonic()
         self._log_request("GET", payload=None)
         if self.path == "/health":
@@ -689,7 +707,7 @@ class OrbitNativeHandler(BaseHTTPRequestHandler):
             return
         self._json({"error": "not found"}, status=404)
 
-    def do_POST(self) -> None:
+    def _do_post(self) -> None:
         self._request_started = time.monotonic()
         try:
             if self.path == "/diagnostics/expert-usage/reset":
@@ -1467,7 +1485,8 @@ def run_server(argv: list[str] | None = None) -> int:
         if not args.verbose_llama_log:
             client.set_quiet_logging()
         _startup_note(f"loading model: {resolve_model_alias(args.alias, paths)}...")
-        client.load()
+        with telemetry.span("orbit.server.model_load"):
+            client.load()
         _log_native_threads(client, "after model load")
 
         # Threads are the one measurable field, and this is the only point at

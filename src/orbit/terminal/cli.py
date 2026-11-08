@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from orbit import telemetry
 from urllib.parse import urlparse
 import time
 
@@ -60,8 +61,19 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+_TELEMETRY_SUBCOMMANDS = ("download", "config", "server", "bench-core", "release-confidence")
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    command = argv[0] if argv and argv[0] in _TELEMETRY_SUBCOMMANDS else "chat"
+    with telemetry.span("orbit.cli", **{"orbit.command": command}) as sp:
+        rc = _main(argv)
+        sp.set_attribute("orbit.exit_code", rc if isinstance(rc, int) else 0)
+        return rc
+
+
+def _main(argv: list[str]) -> int:
     if argv and argv[0] == "download":
         return native_download_main(argv)
     if argv and argv[0] == "config":

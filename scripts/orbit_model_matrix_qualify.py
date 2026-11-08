@@ -58,6 +58,20 @@ class MatrixConfig:
     hf_cache: Path | None = None
     fixtures: Path = DEFAULT_FIXTURES
     output_dir: Path = field(default_factory=lambda: Path("workdir/model-matrix"))
+    keep_server_logs: bool = False
+
+
+SERVER_LOG_KEEP_BYTES = 256 * 1024
+
+
+def keep_server_log(log_path: Path, dest: Path, cap: int = SERVER_LOG_KEEP_BYTES) -> None:
+    """Copy the last `cap` bytes of the server log to `dest` (created with the output dir)."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("rb") as src:
+        size = src.seek(0, os.SEEK_END)
+        src.seek(max(0, size - cap))
+        data = src.read()
+    dest.write_bytes(data)
 
 
 def server_command(model_id: str, port: int, cfg: MatrixConfig) -> list[str]:
@@ -258,6 +272,13 @@ def _qualify_model(manifest, cfg: MatrixConfig, *, available: Callable, launch: 
                 row["status"] = FAIL
                 row["detail"] = (row["detail"] + f" | stop failed: {stop_error}").strip(" |")
         if log_path is not None:
+            if row["status"] != PASS or cfg.keep_server_logs:
+                try:
+                    dest = Path(cfg.output_dir) / f"{manifest.id}.server.log"
+                    keep_server_log(log_path, dest)
+                    row["server_log_path"] = str(dest)
+                except OSError as log_error:
+                    row["server_log_error"] = f"{type(log_error).__name__}: {log_error}"[:200]
             log_path.unlink(missing_ok=True)
         row["wall_seconds"] = round(time.monotonic() - started, 3)
     return row
@@ -323,6 +344,8 @@ def _parser() -> argparse.ArgumentParser:
         p.add_argument("--" + name, type=int, default=default)
     p.add_argument("--allow-empty", action="store_true",
                    help="exit 0 even when no model was qualified (all SKIPPED/NOT_COVERED)")
+    p.add_argument("--keep-server-logs", action="store_true",
+                   help="also keep the (last 256 KiB) server log of PASS rows; non-PASS rows always keep it")
     p.add_argument("--startup-timeout", type=float, default=600.0)
     p.add_argument("--request-timeout", type=float, default=900.0)
     return p
@@ -342,7 +365,8 @@ def main(argv: Sequence[str] | None = None, *, manifests: Sequence | None = None
     cfg = MatrixConfig(ctx=a.ctx, threads=a.threads, threads_batch=a.threads_batch, batch=a.batch,
                        ubatch=a.ubatch, startup_timeout=a.startup_timeout,
                        request_timeout=a.request_timeout, models_dir=a.models_dir,
-                       fixtures=a.fixtures, output_dir=a.output_dir)
+                       fixtures=a.fixtures, output_dir=a.output_dir,
+                       keep_server_logs=a.keep_server_logs)
     if manifests is None:
         from orbit.native_llama.model_registry import load_registry
         manifests = load_registry()

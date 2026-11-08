@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 from pathlib import Path
 import re
 
@@ -23,6 +24,34 @@ _DOCUMENT_RESTART_NOTICE_RE = re.compile(
     r"Restart the native server with the same options and `--ctx (?P<context>[0-9,]+)` "
     r"if the model and available RAM support it, then repeat the request\."
 )
+
+
+ERROR_MESSAGE_CAP = 500
+ERROR_TRACEBACK_CAP = 2000
+ROUTE_EXCERPT_CAP = 2000
+_CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def sanitize_text(text: str, cap: int, *, multiline: bool = False, tail: bool = False) -> str:
+    """Strip control characters, optionally collapse to one line, and bound the length."""
+    text = _CONTROL_RE.sub("", str(text).replace("\r", ""))
+    if not multiline:
+        text = " ".join(text.split())
+    if len(text) > cap:
+        text = text[-cap:] if tail else text[:cap]
+    return text
+
+
+def error_detail_from_exception(error: BaseException) -> dict[str, str]:
+    import traceback
+
+    # Bound the exception line first so a huge message cannot push the frames out of the tail.
+    frames = "".join(traceback.format_tb(error.__traceback__))
+    trace = f"{frames}{sanitize_text(f'{type(error).__name__}: {error}', 300)}\n"
+    return {
+        "message": sanitize_text(f"{type(error).__name__}: {error}", ERROR_MESSAGE_CAP),
+        "traceback_tail": sanitize_text(trace, ERROR_TRACEBACK_CAP, multiline=True, tail=True),
+    }
 
 
 def validate_observation(
@@ -51,7 +80,14 @@ def _result(
     reason: Reason,
     *,
     applicable: bool,
+    error_detail: dict[str, str] | None = None,
 ) -> FixtureResult:
+    calls = observation.calls
+    if status in (Status.FAIL, Status.TECHNICAL_STOP) and observation.route_output is not None:
+        excerpt = sanitize_text(observation.route_output, ROUTE_EXCERPT_CAP, multiline=True)
+        index = next((i for i, item in enumerate(calls) if item.phase == "route"), None)
+        if index is not None:
+            calls = calls[:index] + (replace(calls[index], output_excerpt=excerpt),) + calls[index + 1:]
     wall = observation.wall_seconds
     if wall is None:
         wall = sum(item.wall_seconds or 0.0 for item in observation.calls)
@@ -73,7 +109,7 @@ def _result(
         finish_reason=observation.finish_reason,
         model_call_count=observation.model_call_count,
         retry_count=observation.retry_count,
-        calls=observation.calls,
+        calls=calls,
         aggregate_metrics=AggregateMetrics.from_calls(
             observation.calls,
             wall,
@@ -85,6 +121,7 @@ def _result(
         workflow=observation.workflow,
         state_reuse=observation.state_reuse,
         document=observation.document,
+        error_detail=error_detail,
     )
 
 
@@ -94,6 +131,7 @@ def unavailable_result(
     code: str,
     detail: str,
     status: Status = Status.NOT_APPLICABLE,
+    error_detail: dict[str, str] | None = None,
 ) -> FixtureResult:
     observation = FixtureObservation(
         route=None,
@@ -115,6 +153,7 @@ def unavailable_result(
         status,
         Reason(code, detail),
         applicable=status is not Status.NOT_APPLICABLE,
+        error_detail=error_detail,
     )
 
 

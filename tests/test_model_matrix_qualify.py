@@ -240,6 +240,40 @@ class MatrixQualifyTests(unittest.TestCase):
         path = Path(self.tmp.name) / "matrix.json"
         return code, (json.loads(path.read_text()) if path.exists() else None), h
 
+    def log_harness(self, status):
+        h = Harness(present={"a"}, run_status=status)
+        def launch(model_id, port, cfg, log):
+            log.write_text("early\n" + "z" * (300 * 1024) + "LAST", encoding="utf-8")
+            return FakeProcess()
+        return h, launch
+
+    def test_server_log_kept_on_fail_and_removed_on_pass(self):
+        for status, kept in (("FAIL", True), ("TECHNICAL_STOP", True), ("PASS", False)):
+            h, launch = self.log_harness(status)
+            logs = []
+            def spy(model_id, port, cfg, log, launch=launch):
+                logs.append(log)
+                return launch(model_id, port, cfg, log)
+            code, report, _ = self.run_main([], harness=h, launch=spy)
+            row = report["models"][0]
+            dest = Path(self.tmp.name) / "a.server.log"
+            self.assertEqual(dest.exists(), kept, status)
+            self.assertFalse(logs[0].exists())  # temp log always removed
+            if kept:
+                self.assertEqual(row["server_log_path"], str(dest))
+                data = dest.read_bytes()
+                self.assertEqual(len(data), mq.SERVER_LOG_KEEP_BYTES)
+                self.assertTrue(data.endswith(b"LAST"))
+            else:
+                self.assertNotIn("server_log_path", row)
+
+    def test_keep_server_logs_flag_keeps_pass_log(self):
+        h, launch = self.log_harness("PASS")
+        code, report, _ = self.run_main(["--keep-server-logs"], harness=h, launch=launch)
+        self.assertEqual(code, 0)
+        self.assertTrue((Path(self.tmp.name) / "a.server.log").exists())
+        self.assertIn("server_log_path", report["models"][0])
+
     def test_launch_failure_fails_row_without_stop_and_continues(self):
         h = Harness(present={"a", "b"})
         def launch(model_id, port, cfg, log):

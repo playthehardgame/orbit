@@ -56,6 +56,8 @@ class CallMetric:
     wall_seconds: float | None
     finish_reason: str | None
     retry_reason: str | None = None
+    # Bounded raw model output; only set on the route call of a failing fixture.
+    output_excerpt: str | None = None
 
 
 @dataclass(frozen=True)
@@ -199,6 +201,7 @@ class FixtureObservation:
     workflow: WorkflowEvidence | None = None
     state_reuse: StateReuseEvidence | None = None
     document: DocumentEvidence | None = None
+    route_output: str | None = None
 
 
 @dataclass(frozen=True)
@@ -235,6 +238,8 @@ class FixtureResult:
     workflow: WorkflowEvidence | None
     state_reuse: StateReuseEvidence | None = None
     document: DocumentEvidence | None = None
+    # Diagnostics for TECHNICAL_STOP caused by an exception: {"message", "traceback_tail"}.
+    error_detail: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)

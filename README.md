@@ -126,6 +126,14 @@ This list is not a performance ranking.
 | Granite 4.2 3B | Q4_K_M, Q8_0 |
 | Granite 4.2 8B | Q4_K_M, Q6_K |
 
+**Qualification report diagnostics.** A fixture stopped by an exception carries
+`error_detail` (bounded message and traceback tail) in the report JSON. The `route` call
+of a failing route fixture carries `output_excerpt`, the raw model output capped at 2000
+characters; it is model output stored locally in the report under the output directory,
+so treat reports as local artifacts. The model-matrix driver keeps the last 256 KiB of
+the server log as `<model-id>.server.log` for non-PASS rows (`--keep-server-logs` keeps
+PASS logs too) and records its path as `server_log_path`.
+
 **Backend/CHAT qualification is separate from ANALYSIS semantic qualification.**
 A working model integration and valid tool calls do not establish that its
 explanations are correct.

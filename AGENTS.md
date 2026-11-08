@@ -106,6 +106,13 @@ Three layers, cheapest first; none replaces ANALYSIS semantic qualification.
   3 when nothing was qualified (`--allow-empty` to accept). The driver applies one
   fixed ctx/threads/batch profile (CLI-overridable) and has never been run to
   completion against a real model.
+  Diagnostics: a fixture that raises records `error_detail` (message <=500 chars,
+  traceback tail <=2000) next to the unchanged `fixture execution failed (Type)`
+  reason; the route call of a failing route fixture gets `output_excerpt` (raw
+  model output, <=2000 chars; `_route` path only); non-PASS rows keep the last
+  256 KiB of the server log as `<output-dir>/<model-id>.server.log`
+  (`server_log_path` in the row; `--keep-server-logs` also keeps PASS logs).
+  Tests: `tests/test_qualification_diagnostics.py`.
 
 ### Running the suite on a WSL2 host without the malware corpus
 

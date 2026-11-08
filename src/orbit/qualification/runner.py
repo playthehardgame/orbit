@@ -50,7 +50,9 @@ from .schema import (
     ToolOutcomeRecord,
     WorkflowEvidence,
 )
-from .validators import compare_fixture_results, unavailable_result, validate_observation
+from .validators import (
+    compare_fixture_results, error_detail_from_exception, unavailable_result, validate_observation,
+)
 
 
 NON_GATING_HARDWARE_PROVENANCE_FIELDS = frozenset({"ram_available"})
@@ -105,6 +107,7 @@ class QualificationRunner:
                             code="execution_error",
                             detail=f"fixture execution failed ({type(error).__name__})",
                             status=Status.TECHNICAL_STOP,
+                            error_detail=error_detail_from_exception(error),
                         )
                     )
 
@@ -215,6 +218,7 @@ class RuntimeFixtureExecutor:
             tool_outcomes.append(_tool_outcome(name, content))
 
         route = None
+        route_output = None
         evidence_store = (
             EvidenceStore(workdir / ".qualification-document-evidence")
             if fixture.expect.document is not None else None
@@ -258,6 +262,7 @@ class RuntimeFixtureExecutor:
             route = "CHAT" if final_phase and not tool_calls else None
         elif fixture.expect.route is not None:
             result, route, route_call = self._route(fixture)
+            route_output = result.content or json.dumps(result.tool_calls, ensure_ascii=False, default=str)
             tool_calls.extend(route_call)
             steps.append(ModelStepMetrics.from_result(loop=1, result=result, phase="route"))
             step_walls.append(time.perf_counter() - started)
@@ -336,6 +341,7 @@ class RuntimeFixtureExecutor:
             protocol_issue=protocol_issue,
             tool_outcomes=tuple(tool_outcomes),
             document=document,
+            route_output=route_output,
         )
 
     def _route(self, fixture: FixtureSpec):

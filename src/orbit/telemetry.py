@@ -34,7 +34,7 @@ from typing import Any, Callable, Iterator, Mapping
 
 _TRUE = {"1", "true", "yes", "on"}
 MAX_STR_LEN = 64
-_SAFE_STR = re.compile(r"^[A-Za-z0-9_.:+\-]{1,%d}$" % MAX_STR_LEN)
+_SAFE_STR = re.compile(r"[A-Za-z0-9_.:+\-]{1,%d}" % MAX_STR_LEN)
 
 #: The only attribute keys that may be recorded. Structural metadata only.
 ALLOWED_ATTRIBUTES = frozenset(
@@ -85,7 +85,7 @@ def safe_attributes(attrs: Mapping[str, Any] | None) -> dict[str, Any]:
             continue
         if isinstance(value, (bool, int, float)):
             out[key] = value
-        elif isinstance(value, str) and _SAFE_STR.match(value):
+        elif isinstance(value, str) and _SAFE_STR.fullmatch(value):
             out[key] = value
     return out
 

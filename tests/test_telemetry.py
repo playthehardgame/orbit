@@ -108,3 +108,10 @@ class SdkTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TrailingNewlineTests(unittest.TestCase):
+    def test_trailing_newline_value_is_dropped(self) -> None:
+        from orbit import telemetry
+
+        self.assertEqual(telemetry.safe_attributes({"orbit.model": "abc\n"}), {})

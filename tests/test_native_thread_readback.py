@@ -86,7 +86,7 @@ class ServerReadBackTests(unittest.TestCase):
 
     def test_props_carries_both_fields(self) -> None:
         """The handler copies runtime fields one by one; these must be among them."""
-        source = inspect.getsource(app_module.OrbitNativeHandler.do_GET)
+        source = inspect.getsource(app_module.OrbitNativeHandler._do_get)
         self.assertIn('"native_threads": runtime["native_threads"]', source)
         self.assertIn('"native_threads_batch": runtime["native_threads_batch"]', source)
 

@@ -49,3 +49,10 @@ Exceptions record only the exception type name. Add new attribute keys to
     with telemetry.span("orbit.matrix.case", **{"orbit.matrix.profile": pid}) as sp:
         ...
         sp.set_attribute("orbit.status", "pass")
+
+## Hash attributes are an opt-in disclosure
+
+`orbit.input_sha256` and `orbit.code_sha256` on the ANALYSIS execution span are
+SHA-256 digests of the analysed input and of the generated code. They carry no
+content, but a digest can identify a known sample or confirm a guessed file.
+Enable telemetry only toward collectors you trust to hold that information.

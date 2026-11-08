@@ -497,5 +497,112 @@ class MatrixQualifyTests(unittest.TestCase):
         self.assertFalse(logs[0].exists())
 
 
+class FakeSpan:
+    def __init__(self, name, attrs):
+        self.name, self.attrs = name, dict(attrs)
+
+    def set_attribute(self, key, value):
+        self.attrs[key] = value
+
+    def set_attributes(self, attrs):
+        self.attrs.update(attrs)
+
+
+class TelemetryRecorder:
+    """Stand-in for orbit.telemetry.span/count that records instead of exporting."""
+
+    def __init__(self):
+        self.spans, self.counts = [], []
+
+    def span(self, name, **attrs):
+        import contextlib
+
+        @contextlib.contextmanager
+        def cm():
+            sp = FakeSpan(name, attrs)
+            self.spans.append(sp)
+            yield sp
+        return cm()
+
+    def count(self, name, value=1, **attrs):
+        self.counts.append((name, attrs))
+
+
+class MatrixTelemetryTests(unittest.TestCase):
+    def run_driver(self, ids=("a", "b"), harness=None):
+        h = harness or Harness(present=set(ids))
+        with tempfile.TemporaryDirectory() as tmp:
+            code = mq.main(["--output-dir", tmp], manifests=[manifest(i) for i in ids], **h.hooks())
+            out = ((Path(tmp) / "matrix.json").read_text(), (Path(tmp) / "matrix.txt").read_text())
+        return code, out
+
+    def test_disabled_telemetry_changes_neither_exit_code_nor_reports(self):
+        import os
+        with mock.patch.dict(os.environ, {"ORBIT_OTEL": "0"}):
+            plain = self.run_driver(ids=("a", "b"), harness=Harness(present={"a"}))
+        rec = TelemetryRecorder()
+        with mock.patch.object(mq.telemetry, "span", rec.span), mock.patch.object(mq.telemetry, "count", rec.count):
+            traced = self.run_driver(ids=("a", "b"), harness=Harness(present={"a"}))
+        import re
+        norm = lambda t: re.sub(r"/tmp/tmp\w+", "TMP", re.sub(r'"wall_seconds": [0-9.]+', '"wall_seconds": 0', t))
+        self.assertEqual(plain[0], traced[0])
+        self.assertEqual(norm(plain[1][0]), norm(traced[1][0]))
+        self.assertEqual([l.split()[:2] for l in plain[1][1].splitlines()[1:-1]],
+                         [l.split()[:2] for l in traced[1][1].splitlines()[1:-1]])
+
+    def test_disabled_span_is_the_noop(self):
+        import os
+        with mock.patch.dict(os.environ, {"ORBIT_OTEL": "0"}):
+            self.assertFalse(mq.telemetry.enabled())
+            with mq.telemetry.span("x", **{"orbit.model": "a"}) as sp:
+                sp.set_attribute("orbit.status", "PASS")
+
+    def test_one_span_per_model_row_with_structural_attributes_only(self):
+        rec = TelemetryRecorder()
+        with mock.patch.object(mq.telemetry, "span", rec.span), mock.patch.object(mq.telemetry, "count", rec.count):
+            code, _ = self.run_driver(ids=("a", "b"), harness=Harness(present={"a"}))
+        rows = [s for s in rec.spans if s.name == "orbit.matrix.model"]
+        self.assertEqual(code, 0)
+        self.assertEqual([s.attrs["orbit.model"] for s in rows], ["a", "b"])
+        self.assertEqual([s.attrs["orbit.status"] for s in rows], ["PASS", "SKIPPED"])
+        for s in rows:
+            self.assertLessEqual(set(s.attrs), mq.telemetry.ALLOWED_ATTRIBUTES)
+            self.assertNotIn("detail", " ".join(s.attrs))
+        self.assertEqual(len(rec.counts), 2)
+
+    def test_failing_row_still_exits_1_with_telemetry_attached(self):
+        rec = TelemetryRecorder()
+        with mock.patch.object(mq.telemetry, "span", rec.span), mock.patch.object(mq.telemetry, "count", rec.count):
+            code, _ = self.run_driver(ids=("a",), harness=Harness(present={"a"}, run_error=RuntimeError("secret /path")))
+        self.assertEqual(code, 1)
+        span = rec.spans[0]
+        self.assertEqual(span.attrs["orbit.status"], "FAIL")
+        self.assertNotIn("secret", repr(span.attrs))
+
+    def test_traced_executor_wraps_each_fixture_and_passes_through(self):
+        rec = TelemetryRecorder()
+
+        class Inner:
+            def execute(self, fixture, workdir):
+                if fixture.name == "boom":
+                    raise ValueError("x")
+                return ("obs", fixture.name)
+
+        ex = mq._TracedExecutor(Inner(), "profile-a")
+        with mock.patch.object(mq.telemetry, "span", rec.span):
+            self.assertEqual(ex.execute(SimpleNamespace(name="f1"), Path("/w")), ("obs", "f1"))
+            with self.assertRaises(ValueError):
+                ex.execute(SimpleNamespace(name="boom"), Path("/w"))
+        self.assertEqual([s.name for s in rec.spans], ["orbit.matrix.fixture"] * 2)
+        self.assertEqual(rec.spans[0].attrs["orbit.matrix.case"], "f1")
+        self.assertEqual(rec.spans[0].attrs["orbit.matrix.profile"], "profile-a")
+        self.assertEqual(rec.spans[0].attrs["orbit.outcome"], "completed")
+        self.assertNotIn("orbit.outcome", rec.spans[1].attrs)
+
+    def test_real_span_filters_unsafe_values_when_disabled_or_enabled(self):
+        self.assertEqual(mq.telemetry.safe_attributes({"orbit.matrix.case": "/etc/passwd", "orbit.matrix.profile": "p-1"}),
+                         {"orbit.matrix.profile": "p-1"})
+
+
 if __name__ == "__main__":
     unittest.main()

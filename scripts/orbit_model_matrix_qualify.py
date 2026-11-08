@@ -37,6 +37,8 @@ for _path in (ROOT, SRC):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
+from orbit import telemetry  # noqa: E402 - needs SRC on sys.path; no-op unless ORBIT_OTEL=1
+
 PASS, FAIL, SKIPPED = "PASS", "FAIL", "SKIPPED"
 PARTIAL, NOT_COVERED = "PARTIAL", "NOT_COVERED"
 STATUSES = (PASS, PARTIAL, NOT_COVERED, FAIL, SKIPPED)
@@ -126,6 +128,21 @@ def _signal_group(process, sig) -> None:
             process.terminate()
 
 
+class _TracedExecutor:
+    """One span per fixture; delegates unchanged (observation and exceptions pass through)."""
+
+    def __init__(self, inner, profile_id: str) -> None:
+        self._inner, self._profile_id = inner, profile_id
+
+    def execute(self, fixture, workdir):
+        with telemetry.span("orbit.matrix.fixture", **{
+                "orbit.matrix.profile": self._profile_id,
+                "orbit.matrix.case": getattr(fixture, "name", None)}) as sp:
+            observation = self._inner.execute(fixture, workdir)
+            sp.set_attribute("orbit.outcome", "completed")
+            return observation
+
+
 def run_qualification(base_url: str, profile_id: str, server_pid: int | None,
                       cfg: MatrixConfig, output_path: Path) -> dict[str, Any]:
     """Run QualificationRunner (as scripts/orbit_qualify.py does) against base_url."""
@@ -152,7 +169,7 @@ def run_qualification(base_url: str, profile_id: str, server_pid: int | None,
             fixture_set=fixture_set,
             profile=profile,
             provenance=build_provenance(profile_id, fixture_set.content_hash, profile, props, server_pid),
-            executor=RuntimeFixtureExecutor(backend, process_pid=server_pid),
+            executor=_TracedExecutor(RuntimeFixtureExecutor(backend, process_pid=server_pid), profile_id),
             workdir=Path(workdir),
         ).run(None)
     write_result(run, str(output_path))
@@ -190,9 +207,20 @@ def model_available(manifest, cfg: MatrixConfig) -> Path | None:
         return None
 
 
-def qualify_model(manifest, cfg: MatrixConfig, *, available: Callable, launch: Callable,
-                  wait_health: Callable, run: Callable, stop: Callable,
-                  port_factory: Callable[[], int] = free_port) -> dict[str, Any]:
+def qualify_model(manifest, cfg: MatrixConfig, **hooks) -> dict[str, Any]:
+    """One span per model row; the row itself is produced unchanged by the inner function."""
+    with telemetry.span("orbit.matrix.model", **{
+            "orbit.model": manifest.id,
+            "orbit.matrix.profile": getattr(manifest, "profile_id", None)}) as sp:
+        row = _qualify_model(manifest, cfg, **hooks)
+        sp.set_attributes({"orbit.status": row["status"], "orbit.duration_s": row["wall_seconds"]})
+        telemetry.count("orbit.matrix.rows", **{"orbit.status": row["status"]})
+        return row
+
+
+def _qualify_model(manifest, cfg: MatrixConfig, *, available: Callable, launch: Callable,
+                   wait_health: Callable, run: Callable, stop: Callable,
+                   port_factory: Callable[[], int] = free_port) -> dict[str, Any]:
     row: dict[str, Any] = {"model_id": manifest.id, "display_name": manifest.display_name,
                            "status": SKIPPED, "detail": "", "wall_seconds": 0.0}
     started = time.monotonic()

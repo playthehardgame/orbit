@@ -22,7 +22,7 @@ from orbit.runtime.command_request import (
     parse_command_decision,
     parse_command_decision_from_tool_calls,
 )
-from orbit.runtime.kv_diag import model_call_context
+from orbit.runtime.kv_diag import current_phase, model_call_context
 from orbit.runtime.messages import ROUTE_SYSTEM_PROMPT
 from orbit.runtime.shell_guardrails import shell_failure_from_output
 from orbit.runtime.turn_trace import ModelPhaseStart, ModelStepMetrics
@@ -223,9 +223,20 @@ class RuntimeFixtureExecutor:
             EvidenceStore(workdir / ".qualification-document-evidence")
             if fixture.expect.document is not None else None
         )
+        capture = _RouteCaptureBackend(self.backend)
+        capture_route = (
+            fixture.expect.document is not None
+            or bool(fixture.request.full_request)
+            or (
+                fixture.expect.route is None
+                and fixture.request.tools
+                and fixture.expect.artifact is not None
+            )
+        )
+        runtime_backend = capture if capture_route else self.backend
         runtime = (
-            ChatRuntime(backend=self.backend, evidence_store=evidence_store)
-            if evidence_store is not None else ChatRuntime(backend=self.backend)
+            ChatRuntime(backend=runtime_backend, evidence_store=evidence_store)
+            if evidence_store is not None else ChatRuntime(backend=runtime_backend)
         )
         if fixture.expect.document is not None:
             result = runtime.ask_auto(
@@ -311,6 +322,9 @@ class RuntimeFixtureExecutor:
                 on_phase_start=phase_start,
             )
 
+        if capture_route and capture.route_output is not None:
+            route_output = capture.route_output
+
         if (
             _has_control_markup(result.content)
             and result.content != fixture.expect.exact_output
@@ -357,6 +371,43 @@ class RuntimeFixtureExecutor:
         raw_call = raw_call or command_tool_call_from_content(result.content, allowed)
         calls = (_tool_record(raw_call),) if raw_call is not None else ()
         return result, decision.route.value if decision else None, calls
+
+
+class _RouteCaptureBackend:
+    """Transparent backend proxy recording the raw output of the first route-phase call.
+
+    Pure pass-through: arguments, results and exceptions are untouched; attribute reads
+    and writes (for example ``thinking``) are forwarded to the wrapped backend.
+    """
+
+    def __init__(self, backend: Any) -> None:
+        object.__setattr__(self, "_backend", backend)
+        object.__setattr__(self, "route_output", None)
+
+    def __getattr__(self, name: str) -> Any:
+        value = getattr(self._backend, name)
+        if name not in {"chat", "chat_stream"}:
+            return value
+
+        def call(*args: Any, **kwargs: Any) -> Any:
+            result = value(*args, **kwargs)
+            if self.route_output is None and current_phase() == "route":
+                try:
+                    text = result.content or json.dumps(
+                        result.tool_calls, ensure_ascii=False, default=str,
+                    )
+                    object.__setattr__(self, "route_output", text)
+                except Exception:  # diagnostics must never affect the run
+                    pass
+            return result
+
+        return call
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in {"_backend", "route_output"}:
+            object.__setattr__(self, name, value)
+            return
+        setattr(self._backend, name, value)
 
 
 def compare_runs(

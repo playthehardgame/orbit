@@ -109,7 +109,10 @@ Three layers, cheapest first; none replaces ANALYSIS semantic qualification.
   Diagnostics: a fixture that raises records `error_detail` (message <=500 chars,
   traceback tail <=2000) next to the unchanged `fixture execution failed (Type)`
   reason; the route call of a failing route fixture gets `output_excerpt` (raw
-  model output, <=2000 chars; `_route` path only); non-PASS rows keep the last
+  model output, <=2000 chars; the `_route` path plus the first route-phase call of
+  `ask_auto` fixtures -- full-request, document, artifact -- captured by the
+  pass-through `_RouteCaptureBackend` proxy in `qualification/runner.py`, no change to
+  `ask_auto`; a route aborted mid-stream is not captured); non-PASS rows keep the last
   256 KiB of the server log as `<output-dir>/<model-id>.server.log`
   (`server_log_path` in the row; `--keep-server-logs` also keeps PASS logs).
   Tests: `tests/test_qualification_diagnostics.py`.

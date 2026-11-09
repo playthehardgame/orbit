@@ -128,8 +128,11 @@ This list is not a performance ranking.
 
 **Qualification report diagnostics.** A fixture stopped by an exception carries
 `error_detail` (bounded message and traceback tail) in the report JSON. The `route` call
-of a failing route fixture carries `output_excerpt`, the raw model output capped at 2000
-characters; it is model output stored locally in the report under the output directory,
+of a failing route fixture, and the first route-phase call of a failing `ask_auto`-based
+fixture (full-request, document and artifact fixtures; recorded by a pass-through backend
+proxy, so routing, prompts and results are unchanged), carry `output_excerpt`, the raw
+model output (or tool calls as JSON when the content is empty) capped at 2000
+characters with control characters stripped; it is model output stored locally in the report under the output directory,
 so treat reports as local artifacts. The model-matrix driver keeps the last 256 KiB of
 the server log as `<model-id>.server.log` for non-PASS rows (`--keep-server-logs` keeps
 PASS logs too) and records its path as `server_log_path`.

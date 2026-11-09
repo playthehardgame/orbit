@@ -104,8 +104,8 @@ Three layers, cheapest first; none replaces ANALYSIS semantic qualification.
   is not a qualification claim; a model that fails a fixture there is a finding to
   investigate (for example `pwd_final` is known to fail on some profiles). Exit 1 on FAIL,
   3 when nothing was qualified (`--allow-empty` to accept). The driver applies one
-  fixed ctx/threads/batch profile (CLI-overridable) and has never been run to
-  completion against a real model.
+  fixed ctx/threads/batch profile (CLI-overridable). It ran to completion against
+  three real models on 2026-11-09 (see "Live matrix-v1 results" below).
   Diagnostics: a fixture that raises records `error_detail` (message <=500 chars,
   traceback tail <=2000) next to the unchanged `fixture execution failed (Type)`
   reason; the route call of a failing route fixture gets `output_excerpt` (raw
@@ -116,6 +116,36 @@ Three layers, cheapest first; none replaces ANALYSIS semantic qualification.
   256 KiB of the server log as `<output-dir>/<model-id>.server.log`
   (`server_log_path` in the row; `--keep-server-logs` also keeps PASS logs).
   Tests: `tests/test_qualification_diagnostics.py`.
+
+### Live matrix-v1 results (2026-11-09, WSL2, CPU-only, models from /mnt/l/models)
+
+Measured with `scripts/orbit_model_matrix_qualify.py --threads 12 --keep-server-logs`,
+one model at a time, ctx 8192. Identity, lifecycle and protocol checks PASS for all
+three; every row is overall FAIL (exit 1). Statuses were identical across three
+earlier runs (including one with three models loading concurrently), so they are
+deterministic; only timings were load-dependent. These are findings, NOT
+qualification claims: `matrix-v1` applicability was never tuned per model.
+
+| fixture | minicpm5-2b-q4-k-m | granite42-3b-q4-k-m | granite42-8b-q4-k-m |
+|---|---|---|---|
+| simple_chat | PASS | PASS | PASS |
+| pwd_route | PASS | FAIL (routes `{"route":"CHAT"}`) | PASS |
+| pwd_final | TECHNICAL_STOP | PASS | PASS |
+| json_artifact | FAIL `unsupported_command` | TECHNICAL_STOP | FAIL `unsupported_command` |
+
+- minicpm `pwd_final`: `LlamaServerError: ... does not match the expected peg-native
+  format`; the server log shows an EMPTY generation during a tool-call turn.
+- `json_artifact` on minicpm and granite8b: the route output is a shell command
+  (`{"command":...}`), not `write_artifact`; `exec_shell_full_command` is not in the
+  fixture's allowed set, so it fails closed. Do not loosen the allowed tools.
+- granite3b `json_artifact`: the model emits an XML-style `<tool_call><function=
+  write_artifact>` block (no `content`) that the llama.cpp PEG parser rejects.
+- Open, unconfirmed: whether the backend should treat an empty tool-call generation
+  as an empty response (the empty-final retry path is bypassed because the error is
+  raised first), and whether the Granite 4.2 template should steer toward JSON tool
+  calls. Neither is established as an Orbit bug.
+- Known diagnostics gap: a stream that aborts server-side records no `output_excerpt`
+  (`calls: []`); the cause is visible only in `<model-id>.server.log`.
 
 ### Running the suite on a WSL2 host without the malware corpus
 

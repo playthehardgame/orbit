@@ -15,7 +15,13 @@ from unittest import mock
 
 from orbit.native_llama.bindings import LLAMA_LOAD_MODE_MMAP, LLAMA_LAZY_MODE_ON
 from orbit.native_llama.client import NativeClientConfig, NativeLlamaClient
-from orbit.native_llama.model_profiles import NativeModelProfile, QWEN38_FLASH_NEXT_PROFILE_ID
+from orbit.native_llama.model_profiles import (
+    NativeModelProfile,
+    QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES,
+    QWEN38_ARETE_PROFILE_ID,
+    QWEN38_FLASH_NEXT_PROFILE_ID,
+    QWEN38_SALUKI_PROFILE_ID,
+)
 from orbit.native_llama.paths import NativeLlamaPaths
 from orbit.native_llama.qwen_route_prefix import derive_qwen_route_prefix_spec
 from orbit.native_server import app
@@ -340,6 +346,64 @@ class ClientTests(unittest.TestCase):
         self.assertFalse(self.client._rolling_route_anchor_state.valid)
         self.assertFalse(self.client._rolling_anchor_store().route_shadow_state.valid)
         self.assertFalse(self.client._qwen_route_prefix_anchor_state.valid)
+
+
+
+class AreteClientTests(ClientTests):
+    """The Arete 27B Q4_K_M profile rides the same aligned route-prefix path.
+
+    Same pinned state configuration, its own profile id and its own file type
+    (15). Every lifecycle/identity test of the Flash Next class is inherited.
+    """
+
+    def setUp(self):
+        super().setUp()
+        c = self.client
+        c.model_profile = replace(c.model_profile, profile_id=QWEN38_ARETE_PROFILE_ID,
+            family='qwen3.8-arete', model_name='Arete 27B', architecture='qwen35',
+            template_source='gguf-embedded-reviewed', verified_quantization='Q4_K_M')
+        c._model_metadata_identity = {'general.file_type': '15', 'general.architecture': 'qwen35',
+            'tokenizer.ggml.model': 'gpt2', 'tokenizer.ggml.pre': 'qwen35'}
+
+    def test_quantization_and_unverified_profile_rejected(self):
+        # Arete is qualified at Q4_K_M only; the Flash Next type is wrong here.
+        self.client._model_metadata_identity['general.file_type'] = '31'
+        self.assertIsNone(self.plan()[0])
+        self.client._model_metadata_identity['general.file_type'] = '20'
+        self.assertIsNone(self.plan()[0])
+        self.client.model_profile = replace(self.client.model_profile, verified=False)
+        self.assertEqual(self.client.capture_qwen3_coder_route_prefix_prefill_only(system_prompt=SYSTEM).skip_reason,
+                         'model_profile_ineligible')
+
+    def test_prewarm_rolling_and_long_reply_shadow_compose(self):
+        # The post-final long-reply shadow is admitted per profile on its own
+        # evidence and is not part of the Arete qualification: it stays off.
+        result = self.client.advance_route_checkpoint_after_final('x', should_cancel=lambda: False)
+        self.assertEqual(result['status'], 'skipped')
+        self.assertEqual(result['reason'], 'model_profile_ineligible')
+
+    def test_profile_flag_false_disables_reuse(self):
+        self.client.model_profile = replace(self.client.model_profile, route_prefix_reuse_supported=False)
+        self.assertIsNone(self.plan()[0])
+        self.assertEqual(self.client.capture_qwen3_coder_route_prefix_prefill_only(system_prompt=SYSTEM).skip_reason,
+                         'model_profile_ineligible')
+        self.assertFalse(self.client.qwen_route_prefix_reuse_status()['enabled'])
+
+    def test_identity_is_bound_to_the_arete_profile(self):
+        arete_plan, _ = self.plan()
+        arete = self.client._qwen_route_prefix_state_kwargs(arete_plan.spec)
+        self.client.model_profile = replace(self.client.model_profile,
+                                            profile_id=QWEN38_FLASH_NEXT_PROFILE_ID)
+        flash = self.client._qwen_route_prefix_state_kwargs(arete_plan.spec)
+        self.assertNotEqual(arete, flash)
+
+    def test_only_the_qualified_profiles_are_admitted(self):
+        self.assertEqual(set(QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES),
+                         {QWEN38_FLASH_NEXT_PROFILE_ID, QWEN38_ARETE_PROFILE_ID})
+        # Saluki shares the template but has no evidence: it stays out.
+        self.assertNotIn(QWEN38_SALUKI_PROFILE_ID, QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES)
+        self.client.model_profile = replace(self.client.model_profile, profile_id=QWEN38_SALUKI_PROFILE_ID)
+        self.assertIsNone(self.plan()[0])
 
 if __name__ == '__main__':
     unittest.main()

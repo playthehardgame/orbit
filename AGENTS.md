@@ -127,7 +127,9 @@ API; not downloaded, not checked locally). Identity pinned from the first 16 MiB
 file_type 15, 64 blocks, ctx 262144, bos/pad 248044, eos 248046, add_bos false,
 chat template sha256 `c3cf9e34...1041`, identical to the reviewed Saluki template
 (Qwen XML tool calls, `qwen-think`). Everything capability-related is conservative:
-mtp, route-prefix reuse and rolling-route reuse OFF (not in the qualified set),
+mtp and rolling-route reuse OFF (not in the qualified set); the fixed-head route-prefix
+reuse is ON, live-qualified for this exact artifact and the pinned state config (see
+"Arete route-prefix reuse" below),
 mmproj f16 pinned in the registry (927,607,104 B, sha256 0c9844f4...66f8, projector
 `qwen3vl_merger`, vision only) and `multimodal_supported=True` for this exact identity,
 verified by ONE live smoke only (see "Arete mmproj smoke" below),
@@ -137,6 +139,35 @@ NOT done: the model was never run (not on this machine); no qualification claim
 (matrix-v1 applicability only). Remaining: confirm the downloaded file's sha256 and
 `python3 scripts/orbit_model_matrix.py --build-bin <bin>` identity, then
 `ORBIT_MODELS_DIR=... python3 scripts/orbit_model_matrix_qualify.py --model-id nous-arete-27b-q4-k-m`.
+
+#### Arete route-prefix reuse (2026-11-10, live-qualified)
+
+`QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES` (model_profiles.py) is the explicit set of
+profiles admitted to the call-boundary-aligned fixed-head ROUTE prefix reuse
+(`qwen38-aligned-route-prefix-v1`, the Flash Next mechanism): Flash Next (file_type 31)
+and now Arete (file_type 15); `route_prefix_reuse_supported=True` for Arete. The
+derivation is template-agnostic (token LCP of two rendered references, rounded down
+to `min(progress_step, batch)`, re-verified against the served prompt), so the Arete
+template hash differing from the official Qwen3.8 one does not matter; the identity key
+carries profile id, template hash, tokenizer, shards, backend, ctx and call layout.
+Saluki (same template) stays OFF: no evidence. The post-final long-reply shadow and the
+rolling route stay Flash-Next/Saluki-only and OFF for Arete. The official 27B profile
+`orbit-qwen38-native-v1` has the flag True but no client dispatch branch (inert; untouched).
+Only the pinned state config is eligible (ctx 4096, threads 10/10, batch 256, ubatch 128,
+progress 64, GPU 0, repack off, low-memory off, mmap + lazy on, MTP off); any other
+config (e.g. the default ctx 8192 / 16 threads) fails closed with
+`qwen38_state_config_unqualified` and runs cold. Kill switch `ORBIT_QWEN_ROUTE_PREFIX_REUSE=0`.
+Live gate (one process, one load, Q4_K_M from /mnt/l, pinned config, greedy, thinking off,
+tools off, text-only (no mmproj loaded), `max_tokens=6`, native memory + session cache cleared by hand between calls so a
+restore can only come from the checkpoint): cold U1/U2 vs lazy capture (U1) vs restore
+(U2, U1): final logits byte-identical (max abs diff 0.0, equal sha256), identical output
+text and token counts (`{"route":"CHAT"}` / `Paris`). Route prompts 1058/1069 tokens,
+invariant prefix checkpointed at 1024; evaluated 1058 -> 34 / 45 (cached 1024), prefill
+~222-234 s -> 9.8 s; checkpoint 224,028,204 bytes (the dense 64-block model is ~2.7x the
+Flash Next blob); capture 1, restore 2, fallback 0, invalidation 0. Scope of the claim: ONE
+two-user pair on this prompt, Q4_K_M, CPU, that config, final-step logits after <=6 generated
+tokens; no multi-route/long session, no tools-on routes (ineligible by design), no timing
+guarantee. Harness: scratchpad-only (`gate.py`), not committed.
 
 ### Live matrix-v1 results (2026-11-09, WSL2, CPU-only, models from /mnt/l/models)
 
@@ -218,8 +249,9 @@ qualification claims: `matrix-v1` applicability was never tuned per model.
   0.57 tok/s decode and 4.31 tok/s prefill, peak RSS 28.8 GB on this 31 GB host --
   there is almost no headroom, so do not run anything else alongside it. The
   driver's `QUALIFIED FOR TESTED CAPABILITIES` label covers only these four
-  fixtures: it is NOT an ANALYSIS semantic qualification, and MTP, route-prefix
-  reuse and rolling reuse stay unverified/off (mmproj: see the smoke below). The first model to pass
+  fixtures: it is NOT an ANALYSIS semantic qualification, and MTP and rolling reuse
+  stay unverified/off (route-prefix reuse was later qualified separately, see
+  "Arete route-prefix reuse"; mmproj: see the smoke below). The first model to pass
   the whole matrix-v1 set; MiniCPM5 and Granite 3B/8B still FAIL as above.
 - Arete mmproj smoke (live, CPU, one run): Q4_K_M + `mmproj-NousResearch_Arete-27B-f16.gguf`
   (mtmd `qwen3vl_merger`), a generated 384x384 PNG (red 192x192 square on white),

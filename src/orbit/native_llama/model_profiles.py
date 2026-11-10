@@ -56,6 +56,13 @@ QWEN38_FLASH_NEXT_PROFILE_ID = "orbit-qwen38-flash-next-native-v1"
 QWEN38_FLASH_NEXT_VERIFIED_MODEL_NAME = "Qwen3.8 Flash Next"
 QWEN38_FLASH_NEXT_VERIFIED_FILE_TYPE = "31"
 QWEN38_FLASH_NEXT_VERIFIED_QUANTIZATION = "UD-IQ1_M"
+# Profiles admitted to the fixed-head, call-boundary-aligned ROUTE prefix reuse
+# (qwen38-aligned-route-prefix-v1), each with the one general.file_type it was
+# qualified at. Membership is an evidence decision, never inferred from family.
+QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES = {
+    QWEN38_FLASH_NEXT_PROFILE_ID: QWEN38_FLASH_NEXT_VERIFIED_FILE_TYPE,
+    QWEN38_ARETE_PROFILE_ID: QWEN38_ARETE_VERIFIED_FILE_TYPE,
+}
 LFM25_PROFILE_ID = "orbit-lfm25-native-v1"
 LFM25_Q8_PROFILE_ID = "orbit-lfm25-q8-native-v1"
 LFM25_Q6_PROFILE_ID = "orbit-lfm25-q6-native-v1"
@@ -596,7 +603,7 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             mtp_supported=False,
             gemma_prefix_reuse_supported=False,
             verified_quantization=QWEN38_ARETE_VERIFIED_QUANTIZATION,
-            route_prefix_reuse_supported=False,
+            route_prefix_reuse_supported=True,
             multimodal_supported=True,
         )
 

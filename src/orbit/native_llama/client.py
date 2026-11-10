@@ -54,6 +54,7 @@ from .model_profiles import (
     PROFILE_METADATA_KEYS,
     QWEN36_PROFILE_ID,
     QWEN38_9B_DISTILL_PROFILE_ID,
+    QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES,
     QWEN38_FLASH_NEXT_PROFILE_ID,
     QWEN38_SALUKI_PROFILE_ID,
     QWEN3_CODER_PROFILE_ID,
@@ -629,8 +630,9 @@ class NativeLlamaClient:
             self._invalidate_qwen_route_prefix(
                 "model_reload", profile_id=MINICPM5_PROFILE_ID
             )
-        if getattr(getattr(self, "model_profile", None), "profile_id", None) == QWEN38_FLASH_NEXT_PROFILE_ID:
-            self._invalidate_qwen_route_prefix("model_reload", profile_id=QWEN38_FLASH_NEXT_PROFILE_ID)
+        reload_profile_id = getattr(getattr(self, "model_profile", None), "profile_id", None)
+        if reload_profile_id in QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES:
+            self._invalidate_qwen_route_prefix("model_reload", profile_id=reload_profile_id)
         self._invalidate_qwen36_shell_tool_prefix("model_reload")
         # A reload installs a brand-new context: any recorded sequence refers
         # to memory that no longer exists, possibly from a different model.
@@ -1084,7 +1086,7 @@ class NativeLlamaClient:
         if getattr(profile, "verified", False) and profile_id in (
             QWEN3_CODER_PROFILE_ID,
             ORNITH15_PROFILE_ID,
-            QWEN38_FLASH_NEXT_PROFILE_ID,
+            *QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES,
             GRANITE42_PROFILE_ID,
             GRANITE42_8B_PROFILE_ID,
         ):
@@ -1329,7 +1331,7 @@ class NativeLlamaClient:
             profile_id not in (
                 QWEN3_CODER_PROFILE_ID,
                 ORNITH15_PROFILE_ID,
-                QWEN38_FLASH_NEXT_PROFILE_ID,
+                *QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES,
                 MINICPM5_PROFILE_ID,
                 GRANITE42_PROFILE_ID,
                 GRANITE42_8B_PROFILE_ID,
@@ -1350,7 +1352,7 @@ class NativeLlamaClient:
                 self.config.ornith_route_prefix_reuse_enabled
                 if profile_id == ORNITH15_PROFILE_ID
                 else self.config.qwen_route_prefix_reuse_enabled
-                if profile_id == QWEN38_FLASH_NEXT_PROFILE_ID
+                if profile_id in QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES
                 else self.config.minicpm5_route_prefix_reuse_enabled
                 if profile_id == MINICPM5_PROFILE_ID
                 else self.config.qwen_route_prefix_reuse_enabled
@@ -2832,7 +2834,7 @@ class NativeLlamaClient:
             # during Qwen38's lazy capture, just as cold prefill does.
             cancel_kwargs = (
                 {"should_cancel": should_cancel}
-                if qwen_route_anchor_plan.profile_id == QWEN38_FLASH_NEXT_PROFILE_ID else {}
+                if qwen_route_anchor_plan.profile_id in QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES else {}
             )
             processed_start, reused = self._prepare_memory_with_qwen_route_anchor(
                 qwen_route_anchor_plan, **cancel_kwargs
@@ -3234,7 +3236,7 @@ class NativeLlamaClient:
             enabled = self.config.qwen_route_prefix_reuse_enabled
             prefix_token_count = QWEN_ROUTE_PREFIX_TOKEN_COUNT
             derive_spec = derive_qwen_route_prefix_spec
-        elif profile_id == QWEN38_FLASH_NEXT_PROFILE_ID:
+        elif profile_id in QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES:
             enabled = self.config.qwen_route_prefix_reuse_enabled
             if not self._qwen38_route_prefix_config_eligible():
                 self._invalidate_qwen_route_prefix("qwen38_state_config_unqualified", profile_id=profile_id)
@@ -3265,8 +3267,8 @@ class NativeLlamaClient:
             self._record_qwen_route_prefix_fallback("model_profile_ineligible", profile_id=profile_id)
             return None
         file_type = self._model_metadata_identity.get("general.file_type", "")
-        if profile_id == QWEN38_FLASH_NEXT_PROFILE_ID:
-            file_type_ok = file_type == "31"
+        if profile_id in QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES:
+            file_type_ok = file_type == QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES[profile_id]
         elif profile_id in (GRANITE42_PROFILE_ID, GRANITE42_8B_PROFILE_ID):
             file_type_ok = granite42_quantization_for_file_type(profile_id, file_type) is not None
         else:
@@ -3341,7 +3343,7 @@ class NativeLlamaClient:
                     render_reference=render_reference,
                     tokenize=self.tokenize,
                     **({"decode_alignment": min(self.config.progress_step, self.config.batch_size)}
-                       if profile_id == QWEN38_FLASH_NEXT_PROFILE_ID else {}),
+                       if profile_id in QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES else {}),
                 )
             except Exception as exc:
                 spec = None
@@ -3847,7 +3849,7 @@ class NativeLlamaClient:
     ) -> dict[str, str | None]:
         profile = self.model_profile
         profile_id = profile_id or getattr(profile, "profile_id", QWEN36_PROFILE_ID)
-        if profile_id == QWEN38_FLASH_NEXT_PROFILE_ID:
+        if profile_id in QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES:
             format_version = QWEN38_ROUTE_PREFIX_FORMAT_VERSION
             tokenizer_identity = QWEN_ROUTE_TOKENIZER_IDENTITY
             tools_mode = "qwen38-aligned-route-tools-on-thinking-off"
@@ -3888,7 +3890,7 @@ class NativeLlamaClient:
             model_file_identity = {"size": stat.st_size, "mtime_ns": stat.st_mtime_ns}
         except OSError:
             model_file_identity = {"size": None, "mtime_ns": None}
-        if profile_id == QWEN38_FLASH_NEXT_PROFILE_ID:
+        if profile_id in QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES:
             # In-memory, client-owned checkpoints; no persisted or shared model
             # cache. Include all shards using the existing GGUF split resolver.
             shards = []
@@ -3928,7 +3930,7 @@ class NativeLlamaClient:
                    f"low_memory={self.config.low_memory}:load={self.config.load_mode}:"
                    f"lazy={self.config.lazy_mode}:load_mtp={self.config.load_mtp}:"
                    f"mtp={self.config.use_mtp_experimental}"
-                   if profile_id == QWEN38_FLASH_NEXT_PROFILE_ID else "")
+                   if profile_id in QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES else "")
             ),
             "tools_mode": tools_mode,
         }

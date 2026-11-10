@@ -55,6 +55,7 @@ from orbit.terminal.theme import supports_ansi
 from orbit.native_llama.model_download import download_model, huggingface_resolve_url, parse_huggingface_spec
 from orbit.native_llama.model_store import download_advisory
 from orbit.native_llama.model_profiles import (
+    QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES,
     GRANITE42_8B_PROFILE_ID,
     GRANITE42_PROFILE_ID,
     MINICPM5_PROFILE_ID,
@@ -1583,7 +1584,7 @@ def run_server(argv: list[str] | None = None) -> int:
         elif getattr(getattr(client, "model_profile", None), "profile_id", None) not in (
             QWEN3_CODER_PROFILE_ID,
             ORNITH15_PROFILE_ID,
-            QWEN38_FLASH_NEXT_PROFILE_ID,
+            *QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES,
         ):
             if announce_prewarm:
                 _startup_note("prewarming route-prefix cache...")
@@ -1610,7 +1611,7 @@ def run_server(argv: list[str] | None = None) -> int:
                 # has already run and recorded its result, and this one owns a
                 # separate slot. It is inside the same cancellable window because
                 # it is more startup prefill the operator may want to interrupt.
-                if not prewarm_interrupted and client.model_profile.profile_id != QWEN38_FLASH_NEXT_PROFILE_ID:
+                if not prewarm_interrupted and client.model_profile.profile_id not in QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES:
                     if announce_prewarm:
                         _startup_note("prewarming analysis-prefix cache...")
                     analysis_result = prewarm_startup_analysis_prefix(client)
@@ -1734,7 +1735,7 @@ def prewarm_startup_route_prefix(client: NativeLlamaClient) -> NativeRoutePrefix
     if getattr(profile, "profile_id", None) in (
         QWEN3_CODER_PROFILE_ID,
         ORNITH15_PROFILE_ID,
-        QWEN38_FLASH_NEXT_PROFILE_ID,
+        *QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES,
         MINICPM5_PROFILE_ID,
         GRANITE42_PROFILE_ID,
         GRANITE42_8B_PROFILE_ID,
@@ -1789,7 +1790,7 @@ def _startup_route_prewarm_supported(client: NativeLlamaClient) -> bool:
         in (
             QWEN3_CODER_PROFILE_ID,
             ORNITH15_PROFILE_ID,
-            QWEN38_FLASH_NEXT_PROFILE_ID,
+            *QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES,
             GRANITE42_PROFILE_ID,
             GRANITE42_8B_PROFILE_ID,
         )

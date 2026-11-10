@@ -360,9 +360,11 @@ class Qwen38AreteProfileTests(unittest.TestCase):
             mp.QWEN38_SALUKI_OFFICIAL_TEMPLATE_SHA256,
         )
 
-    def test_cache_and_mtp_capabilities_are_not_inherited(self) -> None:
+    def test_route_prefix_is_enabled_but_mtp_is_not_inherited(self) -> None:
+        # Route-prefix reuse is a live-qualified capability of this exact
+        # artifact (see AGENTS.md); MTP stays off.
         profile = self._detect()
-        self.assertFalse(profile.route_prefix_reuse_supported)
+        self.assertTrue(profile.route_prefix_reuse_supported)
         self.assertFalse(profile.mtp_supported)
 
     def test_template_or_metadata_drift_fails_closed(self) -> None:

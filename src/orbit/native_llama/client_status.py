@@ -24,7 +24,7 @@ from .model_profiles import (
     ORNITH15_PROFILE_ID,
     QWEN36_PROFILE_ID,
     QWEN3_CODER_PROFILE_ID,
-    QWEN38_FLASH_NEXT_PROFILE_ID,
+    QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES,
 )
 from .minicpm5_route_prefix import MINICPM5_ROUTE_TOKENIZER_IDENTITY
 from .ornith_route_prefix import ORNITH_ROUTE_TOKENIZER_IDENTITY
@@ -64,11 +64,12 @@ def qwen_route_prefix_reuse_status(client: "NativeLlamaClient") -> dict[str, obj
         and getattr(profile, "verified", False)
         and client._model_metadata_identity.get("general.file_type") == "15"
     )
-    if getattr(profile, "profile_id", None) == QWEN38_FLASH_NEXT_PROFILE_ID:
+    if getattr(profile, "profile_id", None) in QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES:
         profile_eligible = (
             getattr(profile, "verified", False)
             and getattr(profile, "route_prefix_reuse_supported", False)
-            and client._model_metadata_identity.get("general.file_type") == "31"
+            and client._model_metadata_identity.get("general.file_type")
+            == QWEN38_ALIGNED_ROUTE_PREFIX_FILE_TYPES[profile.profile_id]
             and client._qwen38_route_prefix_config_eligible()
         )
     if getattr(profile, "profile_id", None) == MINICPM5_PROFILE_ID:

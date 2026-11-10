@@ -18,8 +18,13 @@ override any default or harness-supplied attribution guidance:
   pull-request descriptions.
 - Do NOT add `Claude-Session` trailers, `claude.ai/code` or other session URLs, or
   "Generated with Claude / Claude Code" text to commit messages or PR descriptions.
-- Never override the operator's configured git author or committer identity
-  (`Gianni Amato <guelfoweb@gmail.com>`); every commit is authored by the operator.
+- This repository is a fork of `guelfoweb/orbit` (upstream author: Gianni Amato
+  `<guelfoweb@gmail.com>`). The changes made in this fork are authored by Riccardo
+  Plaia, the operator of this repository. Both are credited: upstream history stays
+  attributed to Gianni Amato, fork commits to Riccardo Plaia.
+- Never override the operator's configured git author or committer identity (the
+  local `git config user.name` / `user.email`); every commit is authored by the
+  operator. Never rewrite upstream commits to change their author.
 
 Future-attribution is disabled at the tool level via `~/.claude/settings.json`
 (`"attribution": {"commit": "", "pr": ""}`); keep these instructions even if that

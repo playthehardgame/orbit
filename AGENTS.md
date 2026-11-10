@@ -135,10 +135,34 @@ mmproj f16 pinned in the registry (927,607,104 B, sha256 0c9844f4...66f8, projec
 verified by ONE live smoke only (see "Arete mmproj smoke" below),
 template_source `gguf-embedded-reviewed`. Q4_K_M chosen as bartowski's default and
 consistent with other entries.
-NOT done: the model was never run (not on this machine); no qualification claim
-(matrix-v1 applicability only). Remaining: confirm the downloaded file's sha256 and
-`python3 scripts/orbit_model_matrix.py --build-bin <bin>` identity, then
-`ORBIT_MODELS_DIR=... python3 scripts/orbit_model_matrix_qualify.py --model-id nous-arete-27b-q4-k-m`.
+Since then the file's sha256 was confirmed and the model was run live on this
+machine: matrix-v1 PASS, route-prefix reuse, and an mmproj smoke (see below).
+
+#### Arete performance on this machine (2026-11-10, measured, no code change)
+WSL2, Core Ultra 7 155H (22 vCPU exposed as 11x2, no P/E distinction), 31 GB RAM,
+CPU only. Fixed 367-token prompt, greedy, 32-64 generated tokens, every setting
+repeated; run-to-run noise is about +/-15%.
+- `--repack off` (or `ORBIT_CPU_REPACK=off`) is the dominant lever: with the CPU
+  repack on, an ~11 GB anonymous repacked copy sits beside the 16.8 GB mmap
+  (peak RSS 26.8-28 GB) and decode is erratic (0.1-1.4 tok/s); with it off decode
+  is a stable 2.2-2.7 tok/s and peak RSS 16.6-16.8 GB.
+- 16 or more threads are erratic even with repack off (22 threads: 0.04 tok/s);
+  8-14 are stable and 10-12 best. threads_batch 22 halves prefill. This thread
+  count is specific to this WSL2 host, not a generic default.
+- Model on native ext4 instead of the 9p `/mnt/l`: load ~2 s vs 160-210 s with a
+  warm page cache (cold-cache load not measured: drop_caches needs sudo).
+- No measurable effect: ctx 4096 vs 8192 (-0.25 GB RSS only), batch/ubatch
+  256/64, 256/128, 256/256, 512/512. Prefill stays 4.5-6 tok/s with every knob.
+- Recommended here (equal to the pinned route-prefix config, so speed and prefix
+  reuse coincide): `orbit server --model-id nous-arete-27b-q4-k-m --ctx 4096
+  --threads 10 --threads-batch 10 --batch 256 --ubatch 128 --repack off`, with the
+  model on ext4 (`--models-dir`). Measured 2.3-2.7 tok/s decode, 4.6-5.1 tok/s
+  prefill, 16.6 GB peak RSS, vs 0.57 / 4.3 / 28.8 GB in the matrix-v1 run.
+- The qualify driver does not pass `--repack`; set `ORBIT_CPU_REPACK=off` in its
+  environment. The repack-off default still covers only the qualified hardware
+  pairs; Arete is not among them, so it must be set explicitly.
+- Not measured: image input (mmproj) RAM and speed under this config; why 16+
+  threads become erratic.
 
 #### Arete route-prefix reuse (2026-11-10, live-qualified)
 

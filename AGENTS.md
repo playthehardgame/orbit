@@ -171,6 +171,20 @@ qualification claims: `matrix-v1` applicability was never tuned per model.
   `true`/`false`, lowercase") for the Granite profiles only, rerun
   `scripts/orbit_model_matrix_qualify.py --model-id granite42-3b-q4-k-m`.
   Characterization: `tests/test_granite_tool_format_characterization.py`.
+  EXPERIMENT RESULT (2026-11-10, NEGATIVE, no code kept): the lowercase-boolean
+  wording ("Boolean: JSON true or false, lowercase." appended to the `overwrite` and
+  `create_parents` descriptions of `write_artifact`, Granite profiles only, applied at
+  the native chat-bridge render boundary) was run live on granite42-3b-q4-k-m
+  (--threads 12, idle box). Statuses were IDENTICAL to before (simple_chat PASS,
+  pwd_route FAIL route CHAT, pwd_final PASS, json_artifact TECHNICAL_STOP
+  LlamaServerError). The server log still shows the same rejection:
+  `common_chat_peg_parse: unparsed peg-native output: <tool_call><function=
+  write_artifact><parameter=path>qualification.json</parameter><parameter=overwrite>
+  True</parameter><parameter=create_parents>True</parameter></function></tool_call>`.
+  So the model ignores the description wording and still emits `True`; the 8b
+  regression row was not run because the change was abandoned. Wording-only steering
+  does not fix this; remaining options (parse-failure recovery, or constrained
+  tool-call decoding) change backend behavior and need their own design.
 - FIXED, awaiting live rerun (minicpm5 `pwd_final`): the first attempt (e87793f,
   empty `raw_content` -> empty completion) was based on a wrong diagnosis and did NOT
   fix the live case. The C++ warning `unparsed peg-native output: ` prints only the

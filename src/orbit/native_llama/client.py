@@ -2095,9 +2095,17 @@ class NativeLlamaClient:
                 # there is nothing strict parsing protects: it is an ordinary
                 # empty assistant response for the runtime's bounded empty
                 # retry. Non-empty unparseable output still propagates.
-                if raw_content != "":
-                    final_parse_error = exc
-                parsed = _ProfileParsedOutput("", "", ())
+                if self._minicpm5_plain_text_final(raw_content, tools=tools, thinking=thinking):
+                    # The chat bridge's MiniCPM5 plain-text fallback is keyed on
+                    # the unescaped parser text and never fires once tools are
+                    # attached, so the strict PEG parser rejects every plain
+                    # answer (and the empty one). Mirror that fallback here,
+                    # for text with no tool-envelope marker only.
+                    parsed = _ProfileParsedOutput(raw_content if raw_content.strip() else "", "", ())
+                else:
+                    if raw_content != "":
+                        final_parse_error = exc
+                    parsed = _ProfileParsedOutput("", "", ())
             else:
                 parsed = self._parse_profile_output(raw_content, partial=True)
 
@@ -5375,6 +5383,20 @@ class NativeLlamaClient:
         return serialize_profile_messages(
             messages,
             history_serialization=getattr(profile, "history_serialization", None),
+        )
+
+    def _minicpm5_plain_text_final(self, raw_content: str, *, tools, thinking: bool) -> bool:
+        """True for a tool-bearing MiniCPM5 turn whose output is plain text.
+
+        Any output that mentions a tool-envelope marker stays fail-closed.
+        """
+        profile = getattr(self, "model_profile", None)
+        return (
+            getattr(profile, "tool_call_protocol", None) == "minicpm5-xml"
+            and bool(tools)
+            and not thinking
+            and "<function" not in raw_content
+            and "<param" not in raw_content
         )
 
     def _parse_profile_output(self, generated_text: str, *, partial: bool) -> _ProfileParsedOutput:

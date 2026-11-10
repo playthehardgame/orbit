@@ -171,14 +171,27 @@ qualification claims: `matrix-v1` applicability was never tuned per model.
   `true`/`false`, lowercase") for the Granite profiles only, rerun
   `scripts/orbit_model_matrix_qualify.py --model-id granite42-3b-q4-k-m`.
   Characterization: `tests/test_granite_tool_format_characterization.py`.
-- RESOLVED: an EMPTY native generation (`raw_content == ""`, not cancelled, below
-  max_tokens) used to raise the strict peg-native parse error before the runtime's
-  bounded empty-retry could run. The server error text does not carry the raw output,
-  so the distinction is made where it is known: `NativeLlamaClient`
-  `_complete_profile_chat_text_once` returns an empty completion (finish `stop`),
-  handled by the existing empty_retry -> `_chat_final` path. Non-empty malformed
-  output (including whitespace-only) still raises. Tests:
-  `tests/test_empty_native_generation.py`. Needs a live rerun of minicpm `pwd_final`.
+- FIXED, awaiting live rerun (minicpm5 `pwd_final`): the first attempt (e87793f,
+  empty `raw_content` -> empty completion) was based on a wrong diagnosis and did NOT
+  fix the live case. The C++ warning `unparsed peg-native output: ` prints only the
+  text AFTER the parser's end position, so an empty remainder says nothing about the
+  generation. Real path: native server `/chat/stream` -> `complete_chat_text` ->
+  `_complete_profile_chat_text_once` -> strict `_parse_profile_output(partial=False)`
+  -> bridge `common_chat_parse` throws -> server SSE `error` -> Python
+  `_parse_native_stream` `flush_event`. Root cause, measured in-process with the real
+  MiniCPM5 Q4_K_M bridge: with tools attached the strict PEG parser rejects EVERY
+  non-tool output (`""`, `"hello"`, a normal final answer such as "The current
+  directory is `/x`."), because the bridge's MiniCPM5 plain-text fallback matches
+  unescaped `<function name="` in the serialized parser and never fires with tools.
+  The model's `pwd_final` answer is plain text (9 tokens), not empty. Fix
+  (`_minicpm5_plain_text_final`, `NativeLlamaClient`): for the `minicpm5-xml` profile,
+  tools attached, thinking off, below max_tokens, not cancelled, and no `<function` /
+  `<param` marker in the output, a strict-parse failure is treated as plain content
+  (whitespace-only/empty -> empty completion, handled by the runtime's bounded
+  empty-retry). Any output with a tool-envelope marker still raises (#386 intact);
+  thinking turns stay strict. The e87793f empty-generation branch is kept (harmless
+  for other profiles). No C++ change; the shim fallback remains dead until rebuilt.
+  Tests: `tests/test_empty_native_generation.py`. Live validation pending.
 - Open, unconfirmed: whether the Granite 4.2 template should steer toward JSON tool
   calls. Not established as an Orbit bug.
 - Known diagnostics gap: a stream that aborts server-side records no `output_excerpt`

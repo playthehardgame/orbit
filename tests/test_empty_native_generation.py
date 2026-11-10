@@ -48,6 +48,56 @@ class NativeClientEmptyGenerationTests(unittest.TestCase):
                 self._complete(raw)
 
 
+class MiniCpmPlainTextWithToolsTests(unittest.TestCase):
+    """Live pwd_final: a plain answer while tools are attached must not raise."""
+
+    def _complete(self, raw: str, *, thinking: bool = False, tools=True):
+        import dataclasses
+
+        client = qwen_tests.NativeQwenProfileTests()._client()
+        client.model_profile = dataclasses.replace(client.model_profile, tool_call_protocol="minicpm5-xml")
+
+        def generate(_messages, **kwargs):
+            if raw:
+                kwargs["on_token"](raw)
+            return NativeTimings(10, 9 if raw else 0, 0, 10, 1, 1)
+
+        def strict_parse(text, *, partial):
+            # Mirrors the live bridge with tools attached: only a closed tool
+            # envelope parses; plain text and "" raise with an empty remainder.
+            if "</function>" in text:
+                return mock.Mock(content="", reasoning_content="", tool_calls=())
+            raise RuntimeError("The model produced output that does not match the expected peg-native format")
+
+        with mock.patch.object(client, "complete_chat", side_effect=generate), \
+             mock.patch.object(client, "_parse_profile_output", side_effect=strict_parse):
+            return client._complete_profile_chat_text_once(
+                [{"role": "user", "content": "x"}], max_tokens=64, stop=(),
+                tools=[{"type": "function", "function": {"name": "x"}}] if tools else None,
+                thinking=thinking, route_prefix_anchor=False, qwen_route_prefix_anchor=False,
+                qwen36_shell_tool_prefix_anchor=False, allow_mtp_experimental=None,
+                final_prefix_experiment=False)
+
+    def test_plain_text_answer_with_tools_is_content(self):
+        completion = self._complete("The current directory is `/home/user/project`.")
+        self.assertEqual(completion.content, "The current directory is `/home/user/project`.")
+        self.assertEqual(tuple(completion.tool_calls), ())
+
+    def test_empty_and_whitespace_with_tools_are_empty_completions(self):
+        for raw in ("", " \n"):
+            with self.subTest(raw=raw):
+                self.assertEqual(self._complete(raw).content, "")
+
+    def test_failed_tool_envelope_still_raises(self):
+        for raw in ('<function name="x">', '<function name="x"><param name="a">1</param>', "ok <param"):
+            with self.subTest(raw=raw), self.assertRaisesRegex(RuntimeError, "peg-native"):
+                self._complete(raw)
+
+    def test_thinking_turn_stays_strict(self):
+        with self.assertRaisesRegex(RuntimeError, "peg-native"):
+            self._complete("plain", thinking=True)
+
+
 class RuntimeEmptyResponseBoundTests(unittest.TestCase):
     def test_persistent_empty_tool_turn_is_bounded(self):
         class Backend:

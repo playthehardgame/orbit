@@ -140,6 +140,18 @@ qualification claims: `matrix-v1` applicability was never tuned per model.
   fixture's allowed set, so it fails closed. Do not loosen the allowed tools.
 - granite3b `json_artifact`: the model emits an XML-style `<tool_call><function=
   write_artifact>` block (no `content`) that the llama.cpp PEG parser rejects.
+- granite3b root cause (offline analysis, no fix): the embedded official template
+  (`gguf-embedded-official`) itself prescribes the XML `<tool_call><function=>
+  <parameter=>` format, NOT JSON, so the format is what the template asked for.
+  `write_artifact` has no `content` parameter by design (content-only phase), so the
+  omitted `content` is correct. What peg-native rejects is the Python-style `True`
+  for the boolean `overwrite`/`create_parents` (JSON `true` expected). A 3B model
+  limitation; a Granite-only schema/prompt wording tweak or parse-failure recovery
+  would change prompts/prefix keys or backend behavior and needs live validation.
+  Recommended experiment: reword the two boolean descriptions ("JSON boolean
+  `true`/`false`, lowercase") for the Granite profiles only, rerun
+  `scripts/orbit_model_matrix_qualify.py --model-id granite42-3b-q4-k-m`.
+  Characterization: `tests/test_granite_tool_format_characterization.py`.
 - Open, unconfirmed: whether the backend should treat an empty tool-call generation
   as an empty response (the empty-final retry path is bypassed because the error is
   raised first), and whether the Granite 4.2 template should steer toward JSON tool

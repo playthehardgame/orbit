@@ -2091,7 +2091,12 @@ class NativeLlamaClient:
                 # Strict finalization now rejects cases formerly mapped to an
                 # empty message. Preserve only the existing lossless FINISH
                 # parameter-order recovery below; all other failures propagate.
-                final_parse_error = exc
+                # A generation that is EMPTY carries no envelope at all, so
+                # there is nothing strict parsing protects: it is an ordinary
+                # empty assistant response for the runtime's bounded empty
+                # retry. Non-empty unparseable output still propagates.
+                if raw_content != "":
+                    final_parse_error = exc
                 parsed = _ProfileParsedOutput("", "", ())
             else:
                 parsed = self._parse_profile_output(raw_content, partial=True)

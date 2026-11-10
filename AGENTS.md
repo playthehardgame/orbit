@@ -90,7 +90,7 @@ Three layers, cheapest first; none replaces ANALYSIS semantic qualification.
 - **Offline, every run** (`unittest discover`): `tests/test_model_matrix.py`
   (registry, verified identities, rolling-route sets and README agree) and
   `tests/test_model_capability_matrix.py` (per-profile detection, quantization,
-  mtp/route-prefix/multimodal/thinking flags and fail-closed drift, 15 profiles).
+  mtp/route-prefix/multimodal/thinking flags and fail-closed drift, 16 profiles).
   Adding a model means adding a row to both; they fail until you do.
 - **Live inspection** (needs the llama.cpp build, reads GGUF metadata, no
   weights): `python3 scripts/orbit_model_matrix.py --build-bin <bin>`.
@@ -99,7 +99,7 @@ Three layers, cheapest first; none replaces ANALYSIS semantic qualification.
   `tests/test_model_matrix_qualify.py` use fakes only. Statuses: PASS, PARTIAL
   (some fixtures not applicable), NOT_COVERED (no fixture lists the profile),
   FAIL, SKIPPED. Default fixtures: `qualification/fixtures/matrix-v1.json`, the
-  four `core-v1` fixtures made applicable to all 15 verified profiles
+  four `core-v1` fixtures made applicable to all 16 verified profiles
   (`core-v1` itself is frozen: its hash anchors historical evidence). Applicability
   is not a qualification claim; a model that fails a fixture there is a finding to
   investigate (for example `pwd_final` is known to fail on some profiles). Exit 1 on FAIL,
@@ -116,6 +116,25 @@ Three layers, cheapest first; none replaces ANALYSIS semantic qualification.
   256 KiB of the server log as `<output-dir>/<model-id>.server.log`
   (`server_log_path` in the row; `--keep-server-logs` also keeps PASS logs).
   Tests: `tests/test_qualification_diagnostics.py`.
+
+### NousResearch Arete 27B (added 2026-11-10, registry id `nous-arete-27b-q4-k-m`)
+
+Profile `orbit-qwen38-arete-native-v1`, `bartowski/NousResearch_Arete-27B-GGUF`
+`NousResearch_Arete-27B-Q4_K_M.gguf` (17,203,416,064 bytes, LFS sha256
+`6f186a1fe0c4f741acb3a35b5df96bc2fc7279651f48500246e56079418f091b` per the HF tree
+API; not downloaded, not checked locally). Identity pinned from the first 16 MiB
+(header only, no weights) of that file: `general.name` "Arete 27B", `qwen35`,
+file_type 15, 64 blocks, ctx 262144, bos/pad 248044, eos 248046, add_bos false,
+chat template sha256 `c3cf9e34...1041`, identical to the reviewed Saluki template
+(Qwen XML tool calls, `qwen-think`). Everything capability-related is conservative:
+mtp, route-prefix reuse and rolling-route reuse OFF (not in the qualified set),
+no mmproj in the registry (the repo ships mmproj files, image input is unqualified),
+template_source `gguf-embedded-reviewed`. Q4_K_M chosen as bartowski's default and
+consistent with other entries.
+NOT done: the model was never run (not on this machine); no qualification claim
+(matrix-v1 applicability only). Remaining: confirm the downloaded file's sha256 and
+`python3 scripts/orbit_model_matrix.py --build-bin <bin>` identity, then
+`ORBIT_MODELS_DIR=... python3 scripts/orbit_model_matrix_qualify.py --model-id nous-arete-27b-q4-k-m`.
 
 ### Live matrix-v1 results (2026-11-09, WSL2, CPU-only, models from /mnt/l/models)
 
@@ -152,10 +171,16 @@ qualification claims: `matrix-v1` applicability was never tuned per model.
   `true`/`false`, lowercase") for the Granite profiles only, rerun
   `scripts/orbit_model_matrix_qualify.py --model-id granite42-3b-q4-k-m`.
   Characterization: `tests/test_granite_tool_format_characterization.py`.
-- Open, unconfirmed: whether the backend should treat an empty tool-call generation
-  as an empty response (the empty-final retry path is bypassed because the error is
-  raised first), and whether the Granite 4.2 template should steer toward JSON tool
-  calls. Neither is established as an Orbit bug.
+- RESOLVED: an EMPTY native generation (`raw_content == ""`, not cancelled, below
+  max_tokens) used to raise the strict peg-native parse error before the runtime's
+  bounded empty-retry could run. The server error text does not carry the raw output,
+  so the distinction is made where it is known: `NativeLlamaClient`
+  `_complete_profile_chat_text_once` returns an empty completion (finish `stop`),
+  handled by the existing empty_retry -> `_chat_final` path. Non-empty malformed
+  output (including whitespace-only) still raises. Tests:
+  `tests/test_empty_native_generation.py`. Needs a live rerun of minicpm `pwd_final`.
+- Open, unconfirmed: whether the Granite 4.2 template should steer toward JSON tool
+  calls. Not established as an Orbit bug.
 - Known diagnostics gap: a stream that aborts server-side records no `output_excerpt`
   (`calls: []`); the cause is visible only in `<model-id>.server.log`.
 

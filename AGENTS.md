@@ -208,6 +208,17 @@ qualification claims: `matrix-v1` applicability was never tuned per model.
   Tests: `tests/test_empty_native_generation.py`. Live validation pending.
 - Open, unconfirmed: whether the Granite 4.2 template should steer toward JSON tool
   calls. Not established as an Orbit bug.
+- `nous-arete-27b-q4-k-m` (`orbit-qwen38-arete-native-v1`, Q4_K_M, sha256 and size
+  verified against the registry, 2026-11-10): all four `matrix-v1` fixtures PASS
+  (simple_chat 1 call, pwd_route 1, pwd_final 2, json_artifact 4), identity/
+  lifecycle/protocol PASS, no peg-native parse errors in the server log. Driver
+  wall 2210.7 s on CPU (16 threads, ctx 8192, model on /mnt/l over 9p); measured
+  0.57 tok/s decode and 4.31 tok/s prefill, peak RSS 28.8 GB on this 31 GB host --
+  there is almost no headroom, so do not run anything else alongside it. The
+  driver's `QUALIFIED FOR TESTED CAPABILITIES` label covers only these four
+  fixtures: it is NOT an ANALYSIS semantic qualification, and MTP, route-prefix
+  reuse, rolling reuse and mmproj stay unverified/off. The first model to pass
+  the whole matrix-v1 set; MiniCPM5 and Granite 3B/8B still FAIL as above.
 - Known diagnostics gap: a stream that aborts server-side records no `output_excerpt`
   (`calls: []`); the cause is visible only in `<model-id>.server.log`.
 

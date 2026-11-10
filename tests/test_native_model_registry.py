@@ -72,6 +72,7 @@ class NativeModelRegistryTests(unittest.TestCase):
                 ("Granite 4.2 8B", "orbit-granite42-8b-native-v1"),
                 ("Underdog Saluki 27B 1.0", "orbit-qwen38-saluki-native-v1"),
                 ("Qwen3.8 9B Distill", "orbit-qwen38-9b-distill-native-v1"),
+                ("NousResearch Arete 27B", "orbit-qwen38-arete-native-v1"),
                 ("Gemma 4 E4B Heretic", "orbit-gemma4-e4b-heretic-native-v1"),
             ],
         )
@@ -147,6 +148,11 @@ class NativeModelRegistryTests(unittest.TestCase):
                     "orbit-qwen38-9b-distill-native-v1",
                     "empero-ai/Qwen3.8-9B-Distill-GGUF",
                     "Qwen3.8-9B-Q4_K_M.gguf",
+                ),
+                (
+                    "orbit-qwen38-arete-native-v1",
+                    "bartowski/NousResearch_Arete-27B-GGUF",
+                    "NousResearch_Arete-27B-Q4_K_M.gguf",
                 ),
                 (
                     "orbit-gemma4-e4b-heretic-native-v1",

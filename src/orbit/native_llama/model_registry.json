@@ -183,6 +183,18 @@
       }
     },
     {
+      "id": "nous-arete-27b-q4-k-m",
+      "display_name": "NousResearch Arete 27B",
+      "profile_id": "orbit-qwen38-arete-native-v1",
+      "backend": "native-llama",
+      "architecture": "qwen35",
+      "target": {
+        "repo": "bartowski/NousResearch_Arete-27B-GGUF",
+        "file": "NousResearch_Arete-27B-Q4_K_M.gguf",
+        "cache_glob": "models--bartowski--NousResearch_Arete-27B-GGUF/snapshots/*/NousResearch_Arete-27B-Q4_K_M.gguf"
+      }
+    },
+    {
       "id": "gemma4-e4b-heretic-q4-k-m",
       "display_name": "Gemma 4 E4B Heretic",
       "profile_id": "orbit-gemma4-e4b-heretic-native-v1",

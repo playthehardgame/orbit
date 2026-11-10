@@ -122,6 +122,7 @@ This list is not a performance ranking.
 | LFM2.5 8B-A1B | UD-Q4_K_M, Q8_0, UD-Q6_K |
 | Underdog Saluki 27B 1.0 | IQ2_XS (IQ2-mix GGUF) |
 | Qwen3.8 9B Distill | Q4_K_M |
+| NousResearch Arete 27B | Q4_K_M (bartowski GGUF; applicability only, not qualified) |
 | Gemma 4 E4B Heretic | Q4_K_M (BF16 mmproj; image/audio smoke-tested) |
 | Granite 4.2 3B | Q4_K_M, Q8_0 |
 | Granite 4.2 8B | Q4_K_M, Q6_K |
@@ -170,6 +171,12 @@ calls use the rolling route checkpoint after a real-model state round-trip
 qualification. MTP, the fixed-head route prefix and the optional `mmproj` are
 not qualified; see the
 [Saluki checkpoint](docs/checkpoints/underdog-saluki-qualification.md).
+
+NousResearch Arete 27B (a Qwen3.8-27B finetune, bartowski Q4_K_M GGUF) has its
+own verified profile, matched against the identity read from the real GGUF
+header. Its embedded chat template is identical to the reviewed Saluki one. It
+has not been run through Orbit: rolling route reuse, the fixed-head route
+prefix, MTP and the optional `mmproj` are all off and unqualified.
 
 See the [qualification scope](docs/ANALYSIS_QUALIFICATION.md) and
 [semantic baseline](docs/ANALYSIS_SEMANTIC_BASELINE.md) for evidence and limits.

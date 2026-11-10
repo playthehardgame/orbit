@@ -128,7 +128,7 @@ MATRIX = (
     _row(mp.ORNITH15_PROFILE_ID, ORNITH15_METADATA, "Q4_K_M", False, True, False, True, _FT_NAME),
     _row(mp.QWEN38_PROFILE_ID, QWEN38_METADATA, "Q4_K_M", False, True, False, True, _FT_NAME),
     _row(mp.QWEN38_SALUKI_PROFILE_ID, QWEN38_SALUKI_METADATA, "IQ2_XS", False, False, False, True, _FT_NAME),
-    _row(mp.QWEN38_ARETE_PROFILE_ID, QWEN38_ARETE_METADATA, "Q4_K_M", False, False, False, True, _FT_NAME),
+    _row(mp.QWEN38_ARETE_PROFILE_ID, QWEN38_ARETE_METADATA, "Q4_K_M", False, False, True, True, _FT_NAME),
     _row(mp.QWEN38_FLASH_NEXT_PROFILE_ID, FLASH_NEXT_METADATA, "UD-IQ1_M", False, True, False, True, _FT_NAME),
     _row(mp.LFM25_PROFILE_ID, LFM25_METADATA, "Q4_K_M", False, False, False, True, _FT_NAME),
     _row(mp.LFM25_Q8_PROFILE_ID, {**LFM25_METADATA, "general.file_type": "7"}, "Q8_0",

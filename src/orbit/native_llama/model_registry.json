@@ -192,6 +192,13 @@
         "repo": "bartowski/NousResearch_Arete-27B-GGUF",
         "file": "NousResearch_Arete-27B-Q4_K_M.gguf",
         "cache_glob": "models--bartowski--NousResearch_Arete-27B-GGUF/snapshots/*/NousResearch_Arete-27B-Q4_K_M.gguf"
+      },
+      "mmproj": {
+        "repo": "bartowski/NousResearch_Arete-27B-GGUF",
+        "file": "mmproj-NousResearch_Arete-27B-f16.gguf",
+        "cache_glob": "models--bartowski--NousResearch_Arete-27B-GGUF/snapshots/*/mmproj-NousResearch_Arete-27B-f16.gguf",
+        "size": 927607104,
+        "sha256": "0c9844f4193e2d25642dc62c5921aef23fd71855b8283cb2b2543a77934966f8"
       }
     },
     {

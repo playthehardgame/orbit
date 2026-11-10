@@ -597,6 +597,7 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             gemma_prefix_reuse_supported=False,
             verified_quantization=QWEN38_ARETE_VERIFIED_QUANTIZATION,
             route_prefix_reuse_supported=False,
+            multimodal_supported=True,
         )
 
     qwen38_9b_distill_identity = (

@@ -128,7 +128,9 @@ file_type 15, 64 blocks, ctx 262144, bos/pad 248044, eos 248046, add_bos false,
 chat template sha256 `c3cf9e34...1041`, identical to the reviewed Saluki template
 (Qwen XML tool calls, `qwen-think`). Everything capability-related is conservative:
 mtp, route-prefix reuse and rolling-route reuse OFF (not in the qualified set),
-no mmproj in the registry (the repo ships mmproj files, image input is unqualified),
+mmproj f16 pinned in the registry (927,607,104 B, sha256 0c9844f4...66f8, projector
+`qwen3vl_merger`, vision only) and `multimodal_supported=True` for this exact identity,
+verified by ONE live smoke only (see "Arete mmproj smoke" below),
 template_source `gguf-embedded-reviewed`. Q4_K_M chosen as bartowski's default and
 consistent with other entries.
 NOT done: the model was never run (not on this machine); no qualification claim
@@ -217,8 +219,20 @@ qualification claims: `matrix-v1` applicability was never tuned per model.
   there is almost no headroom, so do not run anything else alongside it. The
   driver's `QUALIFIED FOR TESTED CAPABILITIES` label covers only these four
   fixtures: it is NOT an ANALYSIS semantic qualification, and MTP, route-prefix
-  reuse, rolling reuse and mmproj stay unverified/off. The first model to pass
+  reuse and rolling reuse stay unverified/off (mmproj: see the smoke below). The first model to pass
   the whole matrix-v1 set; MiniCPM5 and Granite 3B/8B still FAIL as above.
+- Arete mmproj smoke (live, CPU, one run): Q4_K_M + `mmproj-NousResearch_Arete-27B-f16.gguf`
+  (mtmd `qwen3vl_merger`), a generated 384x384 PNG (red 192x192 square on white),
+  prompt "main colour, one word", thinking off, temperature 0, max_tokens 6 -> "Red".
+  175 prompt tokens, prefill 65.5 s (the image decoded in two batches), generation
+  6.8 s. The server log shows `find_slot: non-consecutive token position` warnings
+  during image decoding (expected for Qwen3-VL mrope positions, not investigated
+  further). This is a smoke, NOT a qualification: one image, one colour, no text
+  reading, no multi-image or multi-turn use, no ANALYSIS semantics. Registry pin:
+  a size mismatch makes the mmproj fall back to text-only (`mmproj-size-mismatch`),
+  and a verified profile with `multimodal_supported=False` now rejects any projector
+  (generalises the former Qwen3-Coder check). The "Qwen multimodal unsupported"
+  statements elsewhere in this file still hold for every other Qwen profile.
 - Known diagnostics gap: a stream that aborts server-side records no `output_excerpt`
   (`calls: []`); the cause is visible only in `<model-id>.server.log`.
 

@@ -23,6 +23,14 @@ class ModelFileSpec:
 
 
 @dataclass(frozen=True)
+class MmprojSpec(ModelFileSpec):
+    """Multimodal projector file; optional pins make a mismatch fail closed."""
+
+    size: int | None = None
+    sha256: str | None = None
+
+
+@dataclass(frozen=True)
 class MtpSpec(ModelFileSpec):
     enabled_by_default: bool
     required: bool
@@ -37,7 +45,7 @@ class ModelManifest:
     backend: str
     architecture: str
     target: ModelFileSpec
-    mmproj: ModelFileSpec | None
+    mmproj: MmprojSpec | None
     mtp: MtpSpec | None
 
 
@@ -178,6 +186,16 @@ def _file_spec(data: dict[str, Any]) -> ModelFileSpec:
     )
 
 
+def _mmproj_spec(data: dict[str, Any]) -> MmprojSpec:
+    return MmprojSpec(
+        repo=str(data["repo"]),
+        file=str(data["file"]),
+        cache_glob=str(data["cache_glob"]),
+        size=data.get("size"),
+        sha256=data.get("sha256"),
+    )
+
+
 def _mtp_spec(data: dict[str, Any]) -> MtpSpec:
     return MtpSpec(
         repo=str(data["repo"]),
@@ -199,7 +217,7 @@ def _manifest(data: dict[str, Any]) -> ModelManifest:
         backend=str(data["backend"]),
         architecture=str(data["architecture"]),
         target=_file_spec(data["target"]),
-        mmproj=_file_spec(mmproj_data) if isinstance(mmproj_data, dict) else None,
+        mmproj=_mmproj_spec(mmproj_data) if isinstance(mmproj_data, dict) else None,
         mtp=_mtp_spec(mtp_data) if isinstance(mtp_data, dict) else None,
     )
 
@@ -267,7 +285,7 @@ def _validate_registry(data: Any) -> list[dict[str, Any]]:
 
         specs = [("target", _validate_file_spec(model["target"], f"{label}.target"))]
         if "mmproj" in model:
-            specs.append(("mmproj", _validate_file_spec(model["mmproj"], f"{label}.mmproj")))
+            specs.append(("mmproj", _validate_mmproj_spec(model["mmproj"], f"{label}.mmproj")))
         if "mtp" in model:
             specs.append(("mtp", _validate_mtp_spec(model["mtp"], f"{label}.mtp")))
         for kind, spec in specs:
@@ -292,6 +310,22 @@ def _validate_file_spec(value: Any, label: str) -> dict[str, Any]:
         raise ValueError(f"{label}.repo must be owner/repository")
     _validate_relative_path(file_name, f"{label}.file", allow_wildcard=False)
     _validate_relative_path(cache_glob, f"{label}.cache_glob", allow_wildcard=True)
+    return spec
+
+
+def _validate_mmproj_spec(value: Any, label: str) -> dict[str, Any]:
+    spec = _require_mapping(value, label)
+    pins = {key: spec[key] for key in ("size", "sha256") if key in spec}
+    base = {key: spec[key] for key in spec if key not in pins}
+    _validate_file_spec(base, label)
+    if "size" in pins and (type(pins["size"]) is not int or pins["size"] <= 0):
+        raise ValueError(f"{label}.size must be a positive integer")
+    if "sha256" in pins and (
+        not isinstance(pins["sha256"], str)
+        or len(pins["sha256"]) != 64
+        or any(ch not in "0123456789abcdef" for ch in pins["sha256"])
+    ):
+        raise ValueError(f"{label}.sha256 must be 64 lowercase hex characters")
     return spec
 
 
@@ -392,6 +426,14 @@ def resolve_model(
         if mmproj_path is None or not mmproj_path.exists():
             mmproj_path = None
             multimodal_fallback_reason = "mmproj-missing"
+        elif (
+            mmproj_override is None
+            and manifest.mmproj.size is not None
+            and mmproj_path.stat().st_size != manifest.mmproj.size
+        ):
+            # A truncated or wrong projector must never reach the native loader.
+            mmproj_path = None
+            multimodal_fallback_reason = "mmproj-size-mismatch"
 
     draft_path: Path | None = None
     fallback_reason: str | None = None

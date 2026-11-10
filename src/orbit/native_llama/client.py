@@ -1103,6 +1103,17 @@ class NativeLlamaClient:
             and getattr(profile, "profile_id", None) == QWEN3_CODER_PROFILE_ID
         ):
             raise RuntimeError("multimodal input is unsupported by the verified Qwen3-Coder profile")
+        if (
+            self.paths.mmproj_model is not None
+            and profile is not None
+            and getattr(profile, "verified", None) is True
+            and getattr(profile, "multimodal_supported", None) is False
+        ):
+            # Opt-in per exact identity: a projector never attaches to a profile
+            # whose multimodal capability is not pinned on.
+            raise RuntimeError(
+                f"multimodal input is unsupported by the {getattr(profile, 'profile_id', 'unknown')} profile"
+            )
         if self.paths.mmproj_model is not None and self._model and self.mtmd is None:
             raise RuntimeError(
                 "matching Orbit mtmd ABI bridge is required for multimodal inference"

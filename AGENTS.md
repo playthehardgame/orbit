@@ -117,6 +117,26 @@ Three layers, cheapest first; none replaces ANALYSIS semantic qualification.
   (`server_log_path` in the row; `--keep-server-logs` also keeps PASS logs).
   Tests: `tests/test_qualification_diagnostics.py`.
 
+### Principled Intelligence ScopeGuard-2 4B (added 2026-11-12, registry id `scope-guard-v2-4b-q8-0`)
+
+Profile `orbit-scope-guard-v2-4b-native-v1`, `mradermacher/scope-guard-v2-4B-q-2609-GGUF`
+`scope-guard-v2-4B-q-2609.Q8_0.gguf` (4,610,581,408 bytes, LFS sha256
+`a80af72696ac02233a7fbd2d95aef91ac5a6afe7997ea9e630fc4206a5156a74` per the HF tree API;
+not downloaded in full, not checked locally). Upstream
+`principled-intelligence/scope-guard-v2-4B-q-2609` ships safetensors only; the GGUF is a
+third-party conversion. It is a scope/guardrail CLASSIFIER (Qwen3.5-4B finetune; fixed
+`system_prompt.txt`, JSON `scope_class` output), not a general chat model. This change only
+makes it loadable and identity-pinned; there is no scope-guard runtime feature, prompt, or
+parser in Orbit. Identity pinned from the first 16 MiB (header only) of the Q8_0 file:
+`general.name` "Scope Guard v2 4B Q 2609", `qwen35`, file_type 7, 33 blocks, ctx 262144,
+eos 248046, pad 248055 (differs from Qwen3.8's 248044), add_bos false, NO bos id key, chat template
+sha256 `8452ca85...85a8` (stock Qwen3.5 template: XML tool calls, `<think>`; a hash not
+pinned elsewhere; reviewed by reading the Jinja, not by a live run). Conservative: mtp, route-prefix
+reuse and multimodal all OFF (the repo has an mmproj, not pinned). Added to matrix-v1
+applicability only; NOT live-qualified, no chat-quality or classification-accuracy claim.
+License is custom (`principled-intelligence-model-license`, `license:other`) and was not
+reviewed here; check it before redistributing or relying on it.
+
 ### NousResearch Arete 27B (added 2026-11-10, registry id `nous-arete-27b-q4-k-m`)
 
 Profile `orbit-qwen38-arete-native-v1`, `bartowski/NousResearch_Arete-27B-GGUF`

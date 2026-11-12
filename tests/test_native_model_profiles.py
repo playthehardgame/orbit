@@ -20,6 +20,8 @@ from orbit.native_llama.model_profiles import (
     GEMMA4_E4B_HERETIC_PROFILE_ID,
     GEMMA4_E4B_HERETIC_TEMPLATE_SHA256,
     QWEN38_9B_DISTILL_PROFILE_ID,
+    SCOPE_GUARD_OFFICIAL_TEMPLATE_SHA256,
+    SCOPE_GUARD_PROFILE_ID,
     QWEN38_ARETE_PROFILE_ID,
     QWEN38_SALUKI_PROFILE_ID,
     QWEN38_SALUKI_OFFICIAL_TEMPLATE_SHA256,
@@ -102,6 +104,19 @@ QWEN38_9B_DISTILL_METADATA = {
     "tokenizer.ggml.pre": "qwen35",
     "tokenizer.ggml.eos_token_id": "248046",
     "tokenizer.ggml.padding_token_id": "248044",
+    "tokenizer.ggml.add_bos_token": "false",
+    "qwen35.context_length": "262144",
+    "qwen35.block_count": "33",
+}
+
+SCOPE_GUARD_METADATA = {
+    "general.architecture": "qwen35",
+    "general.name": "Scope Guard v2 4B Q 2609",
+    "general.file_type": "7",
+    "tokenizer.ggml.model": "gpt2",
+    "tokenizer.ggml.pre": "qwen35",
+    "tokenizer.ggml.eos_token_id": "248046",
+    "tokenizer.ggml.padding_token_id": "248055",
     "tokenizer.ggml.add_bos_token": "false",
     "qwen35.context_length": "262144",
     "qwen35.block_count": "33",
@@ -432,6 +447,48 @@ class Qwen38NineBDistillProfileTests(unittest.TestCase):
                 self.assertEqual(profile.failure_reason, reason)
         profile = self._detect(template="drifted")
         self.assertEqual(profile.failure_reason, "qwen38_9b_distill_template_identity_mismatch")
+
+
+class ScopeGuardProfileTests(unittest.TestCase):
+    TEMPLATE = "official-scope-guard-template"
+
+    def _detect(self, metadata=None, template=None):
+        digest = hashlib.sha256(self.TEMPLATE.encode()).hexdigest()
+        with mock.patch(
+            "orbit.native_llama.model_profiles.SCOPE_GUARD_OFFICIAL_TEMPLATE_SHA256", digest
+        ):
+            return detect_native_model_profile(
+                metadata or SCOPE_GUARD_METADATA, template or self.TEMPLATE
+            )
+
+    def test_exact_identity_is_verified_and_conservative(self) -> None:
+        profile = self._detect()
+        self.assertEqual(profile.profile_id, SCOPE_GUARD_PROFILE_ID)
+        self.assertTrue(profile.verified)
+        self.assertEqual(profile.verified_quantization, "Q8_0")
+        self.assertFalse(profile.route_prefix_reuse_supported)
+        self.assertFalse(profile.mtp_supported)
+        self.assertFalse(profile.multimodal_supported)
+
+    def test_drift_fails_closed_with_specific_reasons(self) -> None:
+        for key, value, reason in (
+            ("tokenizer.ggml.pre", "qwen2", "scope_guard_tokenizer_identity_mismatch"),
+            ("general.file_type", "15", "scope_guard_quantization_identity_mismatch"),
+            ("qwen35.block_count", "32", "scope_guard_metadata_identity_mismatch"),
+            ("tokenizer.ggml.padding_token_id", "248044", "scope_guard_metadata_identity_mismatch"),
+        ):
+            with self.subTest(key=key):
+                profile = self._detect({**SCOPE_GUARD_METADATA, key: value})
+                self.assertFalse(profile.verified)
+                self.assertEqual(profile.failure_reason, reason)
+        profile = self._detect(template="drifted")
+        self.assertEqual(profile.failure_reason, "scope_guard_template_identity_mismatch")
+
+    def test_real_embedded_template_hash_is_pinned(self) -> None:
+        self.assertEqual(
+            SCOPE_GUARD_OFFICIAL_TEMPLATE_SHA256,
+            "8452ca85cb1e0ff04304c02f417a53305d5ba17f6eb9d5693343ad8355f985a8",
+        )
 
 
 class Gemma4E4BHereticProfileTests(unittest.TestCase):

@@ -183,6 +183,18 @@
       }
     },
     {
+      "id": "scope-guard-v2-4b-q8-0",
+      "display_name": "ScopeGuard-2 4B",
+      "profile_id": "orbit-scope-guard-v2-4b-native-v1",
+      "backend": "native-llama",
+      "architecture": "qwen35",
+      "target": {
+        "repo": "mradermacher/scope-guard-v2-4B-q-2609-GGUF",
+        "file": "scope-guard-v2-4B-q-2609.Q8_0.gguf",
+        "cache_glob": "models--mradermacher--scope-guard-v2-4B-q-2609-GGUF/snapshots/*/scope-guard-v2-4B-q-2609.Q8_0.gguf"
+      }
+    },
+    {
       "id": "nous-arete-27b-q4-k-m",
       "display_name": "NousResearch Arete 27B",
       "profile_id": "orbit-qwen38-arete-native-v1",

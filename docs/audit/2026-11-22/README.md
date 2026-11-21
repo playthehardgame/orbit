@@ -14,7 +14,7 @@ audit trail. Host used: WSL2, 22 logical CPUs, 31 GiB RAM, CPU only.
      mechanism was dropped. Upstream PR #1 (June MTP prototype) was not taken: it
      conflicts with the fork's existing `native_server` and is stale.
 2. Two independent read-only reviews were run (Python expert, software
-   architect). Their complete, unedited reports are in `raw/`. Every claim there
+   architect). Their complete reports are in `raw/` (content as delivered; only trailing whitespace was stripped so the repository's whitespace check passes). Every claim there
    is marked VERIFIED or HYPOTHESIS by its author; the coordinator re-verified the
    ones acted on, by reproducing them or by tests added with the fix.
 3. Fixes were made one finding at a time, each with its own tests, on branch

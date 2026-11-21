@@ -57,7 +57,7 @@ Host: WSL2, Core Ultra 7 155H (22 logical), 31 GiB RAM, 8 GiB swap. Claims marke
 
 ### PY-008 MINOR - pdftotext/strings subprocess output unbounded
 - File: src/orbit/runtime/file_tools.py:373-400 (`subprocess.run(... capture_output=True, timeout=PDF_EXTRACT_TIMEOUT)`); size check on extracted text happens after capture (line ~369).
-- Why: a crafted/large PDF can produce hundreds of MB of text into RAM before the MAX_CHUNK_FILE_BYTES test. HYPOTHESIS magnitude (not run; no PDF). 
+- Why: a crafted/large PDF can produce hundreds of MB of text into RAM before the MAX_CHUNK_FILE_BYTES test. HYPOTHESIS magnitude (not run; no PDF).
 - Fix: stream with Popen and byte cap, or pre-check file size; `strings` fallback likewise.
 - Verify: unit test with fake large output. Risk: low.
 

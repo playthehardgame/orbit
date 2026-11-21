@@ -206,7 +206,10 @@ class ArchitectureRatchetTests(unittest.TestCase):
         for path in _modules().values():
             used |= {m for m in re.findall(r"ORBIT_[A-Z0-9_]+", path.read_text(encoding="utf-8")) if not m.endswith("_")}
         documented: set[str] = set()
-        for doc in [ROOT / "README.md", ROOT / "AGENTS.md", *(ROOT / "docs").rglob("*.md")]:
+        # Audit records quote variable names as evidence; they are not user documentation.
+        audit = ROOT / "docs" / "audit"
+        for doc in [ROOT / "README.md", ROOT / "AGENTS.md",
+                    *(d for d in (ROOT / "docs").rglob("*.md") if audit not in d.parents)]:
             documented |= set(re.findall(r"ORBIT_[A-Z0-9_]+", doc.read_text(encoding="utf-8")))
         undocumented = used - documented
         self.assertEqual(undocumented - KNOWN_UNDOCUMENTED_ENV, set(), "document the new ORBIT_* variable")

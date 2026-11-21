@@ -423,6 +423,30 @@ def compute_cache_ram_mib(
     return max(MIN_CACHE_RAM_MIB, remaining // 2)
 
 
+def memory_fit_advisory(
+    topology: HostTopology, *, model_bytes: int, ctx_tokens: int,
+) -> "str | None":
+    """One advisory line when the model plus its KV window will not fit in the RAM
+    that is free right now, or None. Advisory only: beyond-RAM models run
+    mmap'd from disk and are qualified that way, so this never refuses a start.
+    Every unknown (no meminfo, unknown model size) returns None, never a guess."""
+    available = topology.available_ram_mib or topology.total_ram_mib
+    if model_bytes <= 0 or available <= 0:
+        return None
+    model_mib = model_bytes // (1024 * 1024)
+    kv_mib = 512 + (max(0, ctx_tokens) * 128) // 1024
+    need = model_mib + kv_mib + 1024
+    if need <= available:
+        return None
+    return (
+        f"memory advisory: model ~{model_mib // 1024} GiB + KV ~{kv_mib // 1024 or 1} GiB "
+        f"(ctx {ctx_tokens}) exceeds the ~{available // 1024} GiB currently available; "
+        "expect paging or an out-of-memory kill. Free memory, lower --ctx, use a "
+        "smaller quantization, or set ORBIT_CPU_REPACK=off so the weights are not "
+        "duplicated in RAM."
+    )
+
+
 def heuristic_profile(
     topology: HostTopology,
     *,

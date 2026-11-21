@@ -38,6 +38,7 @@ from orbit.native_server.server_profile import (
     QualifiedStartupProfile,
     Resolution,
     detect_topology,
+    memory_fit_advisory,
     qualified_startup_profile,
     render_profile_lines,
     resolve_cpu_repack,
@@ -1219,6 +1220,8 @@ def _resolve_startup_profile(
     else:
         model_identity, model_bytes = model_identity
     ctx_tokens, _ctx_source = _resolve_ctx(args, qualified)
+    topology = detect_topology()
+    _note_once(memory_fit_advisory(topology, model_bytes=model_bytes, ctx_tokens=ctx_tokens))
     return resolve_profile(
         cli={
             "threads": args.threads,
@@ -1227,7 +1230,7 @@ def _resolve_startup_profile(
             "ubatch": args.ubatch,
             "cache_ram_mib": None,
         },
-        topology=detect_topology(),
+        topology=topology,
         qualified_profile=qualified.tuning_fields() if qualified is not None else None,
         model_bytes=model_bytes,
         model_sha256=model_identity,
@@ -1332,6 +1335,17 @@ def _show_profile(args) -> int:
         print("note: no cached measurement for this model on this machine yet; "
               "starting the server normally will calibrate once")
     return 0
+
+
+_NOTED: set[str] = set()
+
+
+def _note_once(message: str | None) -> None:
+    """Startup note printed at most once per process (profile resolution runs
+    several times per start)."""
+    if message and message not in _NOTED:
+        _NOTED.add(message)
+        _startup_note(message)
 
 
 def _startup_note(message: str) -> None:

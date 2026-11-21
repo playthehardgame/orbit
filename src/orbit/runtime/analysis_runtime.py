@@ -2262,6 +2262,18 @@ def _source_reacquisition_observation(
     )
 
 
+def _bounded_evidence_inputs(authorized: dict[str, str]) -> dict[str, str]:
+    """Authorized evidence bodies that fit the per-read and scratch budgets."""
+    selected: dict[str, str] = {}
+    used = 0
+    for eid, body in authorized.items():
+        size = len(body.encode('utf-8'))
+        if size <= MAX_READ_BYTES and used + size + len(eid.encode()) <= MAX_SCRATCH_BYTES:
+            selected[eid] = body
+            used += size + len(eid.encode())
+    return selected
+
+
 def _no_progress_observation(
     evidence_id: str, *, source_output_id: str | None = None,
     source_output_unavailable: bool = False,
@@ -4711,8 +4723,9 @@ class AnalysisRuntime:
             if message.get("role") == "user":
                 latest = message
                 break
-        if tools and any(t.get("function", {}).get("name") == FINISH_TOOL_NAME
-                         for t in tools):
+        if (tools and any(t.get("function", {}).get("name") == FINISH_TOOL_NAME
+                          for t in tools)) or any(
+                "analysis_finish_request" in m for m in messages):
             # FINISH wraps observations/errors in user-role messages. They
             # are data, not requests, including on either bounded repair.
             evidence_ids = self._finish_rehydration_ids(messages)
@@ -4998,6 +5011,32 @@ class AnalysisRuntime:
             )
         return None
 
+    def _live_duplicate(self, fingerprint, duplicate_of):
+        """Drop a duplicate marker whose evidence is no longer admissible."""
+        available, _ = self._compactable_evidence_sets(self.messages, ())
+        if duplicate_of in available:
+            return duplicate_of
+        self._observed_fingerprints.pop(fingerprint, None)
+        return None
+
+    def _duplicate_observation(self, duplicate_of, source_outputs, evidence_inputs):
+        """No-progress observation, naming a reusable source output if any."""
+        source_duplicate = (
+            self.evidence_store.records[duplicate_of].metadata.get('suppressed_as')
+            in (SOURCE_REACQUISITION, SOURCE_DOMINATED)
+        )
+        source_output_id = next((eid for eid in source_outputs if eid in evidence_inputs), None)
+        return _no_progress_observation(
+            duplicate_of,
+            source_output_id=source_output_id if source_duplicate else None,
+            source_output_unavailable=source_duplicate and source_output_id is None,
+        )
+
+    def _remember_validated(self, fingerprint, evidence_id):
+        """The program really ran: its suppressed observation is still a
+        committed, re-attestable result over this exact input state."""
+        self._observed_fingerprints.setdefault(fingerprint, evidence_id)
+
     def step(
         self,
         analyst_message: str,
@@ -5182,15 +5221,9 @@ class AnalysisRuntime:
         workspace_state = self._workspace_state()
         # These immutable copies are available only through explicit helper
         # reads. They are not a filesystem mount or model delivery.
-        evidence_inputs = {}
-        evidence_bytes = 0
         source_outputs = self._attested_source_output()
-        authorized_inputs = {**self._attested_transform_outputs(), **source_outputs}
-        for eid, body in authorized_inputs.items():
-            size = len(body.encode('utf-8'))
-            if size <= MAX_READ_BYTES and evidence_bytes + size + len(eid.encode()) <= MAX_SCRATCH_BYTES:
-                evidence_inputs[eid] = body
-                evidence_bytes += size + len(eid.encode())
+        evidence_inputs = _bounded_evidence_inputs(
+            {**self._attested_transform_outputs(), **source_outputs})
         evidence_manifest = [
             {'evidence_id': eid, 'sha256': hashlib.sha256(body.encode()).hexdigest(),
              'source_sha256': self.source.sha256, 'byte_range': [0, len(body.encode())]}
@@ -5229,10 +5262,7 @@ class AnalysisRuntime:
             duplicate_of = self._observed_fingerprints.get(fingerprint)
 
         if duplicate_of is not None:
-            available, _ = self._compactable_evidence_sets(self.messages, ())
-            if duplicate_of not in available:
-                self._observed_fingerprints.pop(fingerprint, None)
-                duplicate_of = None
+            duplicate_of = self._live_duplicate(fingerprint, duplicate_of)
 
         if duplicate_of is not None:
             # No sandbox, no new evidence record, no new evidence id: the
@@ -5246,18 +5276,8 @@ class AnalysisRuntime:
                 question=active_question, controller=controller,
                 detail="duplicate observation, not run again",
             )
-            source_duplicate = (
-                self.evidence_store.records[duplicate_of].metadata.get('suppressed_as')
-                in (SOURCE_REACQUISITION, SOURCE_DOMINATED)
-            )
-            source_output_id = next((eid for eid in source_outputs if eid in evidence_inputs), None)
-            self._append_tool_result(
-                calls[0], _no_progress_observation(
-                    duplicate_of,
-                    source_output_id=source_output_id if source_duplicate else None,
-                    source_output_unavailable=source_duplicate and source_output_id is None,
-                )
-            )
+            self._append_tool_result(calls[0], self._duplicate_observation(
+                duplicate_of, source_outputs, evidence_inputs))
             return AnalysisStepResult(
                 model_calls=1,
                 action_attempted=True,
@@ -5367,10 +5387,8 @@ class AnalysisRuntime:
                     ),
                 },
             )
-            # The program really ran. Its suppressed observation is still a
-            # committed, re-attestable result over this exact input state.
             if validated is not None:
-                self._observed_fingerprints.setdefault(fingerprint, record.evidence_id)
+                self._remember_validated(fingerprint, record.evidence_id)
             # Appended like any other tool result: the model made a call and
             # the history must answer it. Skipping this would leave an
             # assistant turn with no matching result, which admission refuses

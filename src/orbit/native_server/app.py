@@ -835,7 +835,7 @@ class OrbitNativeHandler(BaseHTTPRequestHandler):
         return self.server.orbit_state  # type: ignore[attr-defined]
 
     def _read_json(self) -> dict[str, Any]:
-        length = int(self.headers.get("Content-Length", "0"))
+        length = parse_content_length(self.headers.get("Content-Length"))
         if length <= 0:
             return {}
         raw = self.rfile.read(length)
@@ -1364,6 +1364,61 @@ def _report_startup_prewarm(label: str, result: "NativeRoutePrefixPrefillResult"
         _startup_note(f"prewarm failed ({label}): {result.failed_reason or 'unknown'}")
 
 
+MAX_REQUEST_BODY_ENV = "ORBIT_MAX_REQUEST_BYTES"
+DEFAULT_MAX_REQUEST_BODY_BYTES = 64 * 1024 * 1024
+
+
+def max_request_body_bytes(environ: Mapping[str, str] | None = None) -> int:
+    """Largest accepted request body; invalid or non-positive values fall back."""
+    env = os.environ if environ is None else environ
+    try:
+        value = int(env.get(MAX_REQUEST_BODY_ENV, ""))
+    except ValueError:
+        return DEFAULT_MAX_REQUEST_BODY_BYTES
+    return value if value > 0 else DEFAULT_MAX_REQUEST_BODY_BYTES
+
+
+def parse_content_length(raw: str | None, *, limit: int | None = None) -> int:
+    """Validated Content-Length. Raises ValueError (HTTP 400) instead of reading
+    an unbounded or malformed body into memory."""
+    if raw is None or not raw.strip():
+        return 0
+    try:
+        length = int(raw.strip())
+    except ValueError as exc:
+        raise ValueError("invalid Content-Length") from exc
+    if length < 0:
+        raise ValueError("invalid Content-Length")
+    maximum = max_request_body_bytes() if limit is None else limit
+    if length > maximum:
+        raise ValueError(f"request body exceeds {maximum} bytes")
+    return length
+
+
+def _raise_keyboard_interrupt(signum: int, frame: Any) -> None:
+    raise KeyboardInterrupt
+
+
+def serve_until_terminated(httpd: Any) -> None:
+    """serve_forever that also stops cleanly on SIGTERM/SIGHUP.
+
+    `kill`, a service manager and `wsl --shutdown` send SIGTERM; without this the
+    shutdown path (stop route shadow, free the model context, log server_stop)
+    is skipped. Handlers are only installed from the main thread and restored.
+    """
+    previous: dict[int, Any] = {}
+    if threading.current_thread() is threading.main_thread():
+        for name in ("SIGTERM", "SIGHUP"):
+            number = getattr(signal, name, None)
+            if number is not None:
+                previous[number] = signal.signal(number, _raise_keyboard_interrupt)
+    try:
+        httpd.serve_forever()
+    finally:
+        for number, handler in previous.items():
+            signal.signal(number, handler)
+
+
 def run_server(argv: list[str] | None = None, *, research_admission=None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -1663,7 +1718,7 @@ def run_server(argv: list[str] | None = None, *, research_admission=None) -> int
     print(f"orbit-server model: {model_alias}", flush=True)
     print(f"orbit-server listening on http://{args.host}:{args.port}", flush=True)
     try:
-        httpd.serve_forever()
+        serve_until_terminated(httpd)
     except KeyboardInterrupt:
         print("\norbit-server stopped", flush=True)
     finally:

@@ -6,6 +6,7 @@ import re
 import signal
 import shlex
 import subprocess
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -412,6 +413,47 @@ def execute_exec_shell_full_command(arguments: dict[str, Any], *, workdir: Path,
     return _bounded_text(content, output_size)
 
 
+# A runaway command (`yes`, a log tail, a huge cat) must not be able to exhaust
+# the host's RAM through the pipes: output past the cap is read and discarded.
+SHELL_STREAM_CAPTURE_CHARS = 8 * 1024 * 1024
+SHELL_STREAM_TRUNCATION_NOTE = "\n[orbit: output truncated, more than {limit} characters produced]"
+
+
+class _BoundedStream:
+    """Drain one pipe on a thread, keeping at most `limit` characters."""
+
+    def __init__(self, stream: Any, limit: int) -> None:
+        self._stream = stream
+        self._limit = limit
+        self._parts: list[str] = []
+        self._kept = 0
+        self.truncated = False
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self) -> None:
+        try:
+            while True:
+                chunk = self._stream.read(65536)
+                if not chunk:
+                    return
+                room = self._limit - self._kept
+                if room > 0:
+                    self._parts.append(chunk[:room])
+                    self._kept += min(len(chunk), room)
+                if len(chunk) > room:
+                    self.truncated = True
+        except (OSError, ValueError):
+            return
+
+    def result(self, join_timeout: float | None = None) -> str:
+        self._thread.join(join_timeout)
+        text = "".join(self._parts)
+        if self.truncated:
+            text += SHELL_STREAM_TRUNCATION_NOTE.format(limit=self._limit)
+        return text
+
+
 def _run_shell_command(raw_command: str, *, cwd: Path, env: dict[str, str], timeout: int) -> subprocess.CompletedProcess[str]:
     process = subprocess.Popen(
         raw_command,
@@ -419,19 +461,25 @@ def _run_shell_command(raw_command: str, *, cwd: Path, env: dict[str, str], time
         env=env,
         shell=True,
         text=True,
+        errors="replace",
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         start_new_session=(os.name == "posix"),
     )
+    out = _BoundedStream(process.stdout, SHELL_STREAM_CAPTURE_CHARS)
+    err = _BoundedStream(process.stderr, SHELL_STREAM_CAPTURE_CHARS)
     try:
-        stdout, stderr = process.communicate(timeout=timeout)
+        process.wait(timeout=timeout)
     except subprocess.TimeoutExpired as exc:
         _terminate_process_tree(process)
-        stdout, stderr = process.communicate()
-        exc.stdout = stdout
-        exc.stderr = stderr
+        process.wait()
+        # A grandchild that kept a pipe open must not hang the tool call.
+        exc.stdout = out.result(join_timeout=2)
+        exc.stderr = err.result(join_timeout=2)
         raise exc
-    return subprocess.CompletedProcess(raw_command, process.returncode, stdout, stderr)
+    return subprocess.CompletedProcess(
+        raw_command, process.returncode, out.result(join_timeout=5), err.result(join_timeout=5)
+    )
 
 
 def _terminate_process_tree(process: subprocess.Popen[str]) -> None:

@@ -266,6 +266,17 @@ the declared size is published by atomic rename. Existing final files are reused
 See [download recovery](docs/DOWNLOAD_RECOVERY.md) for server compatibility and
 integrity limits.
 
+### Server limits and shutdown
+
+`orbit server` rejects a request whose `Content-Length` is malformed or larger
+than 64 MiB with HTTP 400 before reading the body. Set `ORBIT_MAX_REQUEST_BYTES`
+to a positive byte count to change the limit; invalid or non-positive values
+fall back to the default. `SIGTERM` and `SIGHUP` (a service stop, `kill`,
+`wsl --shutdown`) stop the server through the same path as Ctrl-C: the model
+context is freed and `server_stop` is logged. Shell tool output is captured up
+to 8 MiB per stream; anything beyond that is read and discarded, and a marker
+says so.
+
 ## Development and tests
 
 For the lightweight, artifact-free [core CI gate](docs/CORE_CI.md), run:

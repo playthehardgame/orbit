@@ -124,6 +124,7 @@ This list is not a performance ranking.
 | Qwen3.8 9B Distill | Q4_K_M |
 | ScopeGuard-2 4B | Q8_0 (mradermacher GGUF; scope-guard classifier, identity only, not qualified) |
 | NousResearch Arete 27B | Q4_K_M (bartowski GGUF; applicability only, not qualified) |
+| Qwen3.8 27B TurboFCFusion Heretic NEO-CODER | Q4_K_M (DavidAU GGUF, plain non-MTP file; identity only, not qualified) |
 | Gemma 4 E4B Heretic | Q4_K_M (BF16 mmproj; image/audio smoke-tested) |
 | Granite 4.2 3B | Q4_K_M, Q8_0 |
 | Granite 4.2 8B | Q4_K_M, Q6_K |
@@ -178,6 +179,15 @@ own verified profile, matched against the identity read from the real GGUF
 header. Its embedded chat template is identical to the reviewed Saluki one. It
 has not been run through Orbit: rolling route reuse, the fixed-head route
 prefix, MTP and the optional `mmproj` are all off and unqualified.
+
+DavidAU Qwen3.8 27B TurboFCFusion Heretic NEO-CODER (a Qwen3.8-27B finetune/merge,
+plain non-MTP Q4_K_M GGUF) has its own verified profile, matched against the
+identity read from the real GGUF header (`general.name` is "Qwen3.8 27B Brainwaves
+NM HERETIC BR LOA1", not the repository name). Its embedded chat template is
+different from the Saluki/Arete one and was reviewed by reading it, not by a live
+run. It has not been run through Orbit: rolling route reuse, the fixed-head route
+prefix, MTP and the optional `mmproj` are all off and unqualified. The repository's
+MTP files are not covered by this profile.
 
 See the [qualification scope](docs/ANALYSIS_QUALIFICATION.md) and
 [semantic baseline](docs/ANALYSIS_SEMANTIC_BASELINE.md) for evidence and limits.

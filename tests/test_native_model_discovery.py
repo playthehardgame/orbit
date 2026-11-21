@@ -46,7 +46,7 @@ class NativeModelDiscoveryTests(unittest.TestCase):
                 inspector=lambda _path: self.fail("no file should be inspected"),
             )
 
-        self.assertEqual(len(result.rows), 17)
+        self.assertEqual(len(result.rows), 18)
         self.assertTrue(all(row.local == "MISSING" for row in result.rows))
         self.assertTrue(all(row.support == "VERIFIED" for row in result.rows))
         self.assertEqual(
@@ -60,6 +60,7 @@ class NativeModelDiscoveryTests(unittest.TestCase):
                 "orbit download empero-ai/Qwen3.8-9B-Distill-GGUF/Qwen3.8-9B-Q4_K_M.gguf",
                 "orbit download mradermacher/scope-guard-v2-4B-q-2609-GGUF/scope-guard-v2-4B-q-2609.Q8_0.gguf",
                 "orbit download bartowski/NousResearch_Arete-27B-GGUF/NousResearch_Arete-27B-Q4_K_M.gguf",
+                "orbit download DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF/Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-Q4_K_M.gguf",
                 "orbit download llmfan46/gemma-4-E4B-it-ultra-uncensored-heretic-GGUF/gemma-4-E4B-it-ultra-uncensored-heretic-Q4_K_M.gguf",
                 "orbit download unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf",
                 "orbit download unsloth/Qwen3.8-Flash-Next-GGUF/Qwen3.8-Flash-Next-UD-IQ1_M-00001-of-00003.gguf",
@@ -250,7 +251,7 @@ class NativeModelDiscoveryTests(unittest.TestCase):
 
         self.assertEqual(result.metadata_inspections, 1)
         self.assertFalse(any(row.model == "other.gguf" for row in result.rows))
-        self.assertEqual(result.filesystem_scans, 19)
+        self.assertEqual(result.filesystem_scans, 20)
 
     def test_symlink_escape_is_not_inspected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

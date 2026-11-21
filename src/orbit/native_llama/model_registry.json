@@ -214,6 +214,18 @@
       }
     },
     {
+      "id": "davidau-qwen38-27b-turbo-fc-q4-k-m",
+      "display_name": "Qwen3.8 27B TurboFCFusion Heretic NEO-CODER",
+      "profile_id": "orbit-qwen38-turbo-fcfusion-native-v1",
+      "backend": "native-llama",
+      "architecture": "qwen35",
+      "target": {
+        "repo": "DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF",
+        "file": "Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-Q4_K_M.gguf",
+        "cache_glob": "models--DavidAU--Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF/snapshots/*/Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-Q4_K_M.gguf"
+      }
+    },
+    {
       "id": "gemma4-e4b-heretic-q4-k-m",
       "display_name": "Gemma 4 E4B Heretic",
       "profile_id": "orbit-gemma4-e4b-heretic-native-v1",

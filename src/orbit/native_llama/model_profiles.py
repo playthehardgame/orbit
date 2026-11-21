@@ -44,6 +44,18 @@ QWEN38_ARETE_VERIFIED_MODEL_NAME = "Arete 27B"
 QWEN38_ARETE_OFFICIAL_TEMPLATE_SHA256 = "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041"
 QWEN38_ARETE_VERIFIED_FILE_TYPE = "15"
 QWEN38_ARETE_VERIFIED_QUANTIZATION = "Q4_K_M"
+# DavidAU Qwen3.8-27B TurboFCFusion 735/882 Heretic Uncensored NEO-CODER MAX
+# (plain, non-MTP Q4_K_M GGUF): dense `qwen35`, Qwen3.8-27B finetune/merge. The
+# GGUF's general.name is "Qwen3.8 27B Brainwaves NM HERETIC BR LOA1", not the
+# repo name. Its embedded template differs from the Saluki/Arete one (it adds
+# the reasoning_effort/preserve_thinking blocks) and was reviewed by reading the
+# Jinja only; the tool-call format is the same Qwen XML. Distinct identity,
+# nothing inherited. Identity read from the real GGUF header (first 16 MiB).
+QWEN38_TURBO_FC_PROFILE_ID = "orbit-qwen38-turbo-fcfusion-native-v1"
+QWEN38_TURBO_FC_VERIFIED_MODEL_NAME = "Qwen3.8 27B Brainwaves NM HERETIC BR LOA1"
+QWEN38_TURBO_FC_OFFICIAL_TEMPLATE_SHA256 = "514d5304fcac63bda60e6faf860d5657010cf43cbc4c633c8bf678ee184e7a37"
+QWEN38_TURBO_FC_VERIFIED_FILE_TYPE = "15"
+QWEN38_TURBO_FC_VERIFIED_QUANTIZATION = "Q4_K_M"
 # Principled Intelligence ScopeGuard-2 4B (mradermacher Q8_0 GGUF): a scope /
 # guardrail classifier fine-tuned from Qwen3.5-4B (`qwen35`, 33 blocks). It is a
 # single-purpose classifier (fixed system prompt, JSON `scope_class` output), not
@@ -347,6 +359,9 @@ VERIFIED_NATIVE_MODEL_IDENTITIES = (
     ),
     VerifiedNativeModelIdentity(
         QWEN38_ARETE_PROFILE_ID, QWEN38_ARETE_VERIFIED_MODEL_NAME, "qwen35"
+    ),
+    VerifiedNativeModelIdentity(
+        QWEN38_TURBO_FC_PROFILE_ID, QWEN38_TURBO_FC_VERIFIED_MODEL_NAME, "qwen35"
     ),
     VerifiedNativeModelIdentity(
         SCOPE_GUARD_PROFILE_ID, SCOPE_GUARD_VERIFIED_MODEL_NAME, "qwen35"
@@ -661,6 +676,43 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             verified_quantization=QWEN38_ARETE_VERIFIED_QUANTIZATION,
             route_prefix_reuse_supported=True,
             multimodal_supported=True,
+        )
+
+    qwen38_turbo_fc_identity = (
+        architecture == "qwen35"
+        and model_name == QWEN38_TURBO_FC_VERIFIED_MODEL_NAME
+        and tokenizer_model == "gpt2"
+        and tokenizer_pre == "qwen35"
+        and file_type == QWEN38_TURBO_FC_VERIFIED_FILE_TYPE
+        and metadata.get("tokenizer.ggml.bos_token_id", "").strip() == "248044"
+        and metadata.get("tokenizer.ggml.eos_token_id", "").strip() == "248046"
+        and metadata.get("tokenizer.ggml.padding_token_id", "").strip() == "248044"
+        and metadata.get("tokenizer.ggml.add_bos_token", "").strip().lower() in ("", "false")
+        and metadata.get("qwen35.context_length", "").strip() == "262144"
+        and metadata.get("qwen35.block_count", "").strip() == "64"
+        and "qwen35.nextn_predict_layers" not in metadata
+        and template_hash == QWEN38_TURBO_FC_OFFICIAL_TEMPLATE_SHA256
+    )
+    if qwen38_turbo_fc_identity:
+        return NativeModelProfile(
+            profile_id=QWEN38_TURBO_FC_PROFILE_ID,
+            family="qwen3.8-turbo-fcfusion",
+            model_name=model_name,
+            architecture=architecture,
+            renderer="llama.cpp-jinja",
+            reasoning_protocol="qwen-think",
+            tool_call_protocol="qwen3.6-xml",
+            history_serialization="qwen-leading-system-only",
+            verified=True,
+            failure_reason=None,
+            template_source="gguf-embedded-reviewed",
+            template_sha256=template_hash,
+            supported_capabilities=TEXT_CAPABILITIES,
+            thinking_supported=True,
+            mtp_supported=False,
+            gemma_prefix_reuse_supported=False,
+            verified_quantization=QWEN38_TURBO_FC_VERIFIED_QUANTIZATION,
+            route_prefix_reuse_supported=False,
         )
 
     qwen38_9b_distill_identity = (
@@ -1042,6 +1094,14 @@ def _unverified_reason(
             if template_hash != QWEN38_ARETE_OFFICIAL_TEMPLATE_SHA256:
                 return "qwen38_arete_template_identity_mismatch"
             return "qwen38_arete_metadata_identity_mismatch"
+        if model_name == QWEN38_TURBO_FC_VERIFIED_MODEL_NAME:
+            if tokenizer_model != "gpt2" or tokenizer_pre != "qwen35":
+                return "qwen38_turbo_fc_tokenizer_identity_mismatch"
+            if file_type != QWEN38_TURBO_FC_VERIFIED_FILE_TYPE:
+                return "qwen38_turbo_fc_quantization_identity_mismatch"
+            if template_hash != QWEN38_TURBO_FC_OFFICIAL_TEMPLATE_SHA256:
+                return "qwen38_turbo_fc_template_identity_mismatch"
+            return "qwen38_turbo_fc_metadata_identity_mismatch"
         if model_name == SCOPE_GUARD_VERIFIED_MODEL_NAME:
             if tokenizer_model != "gpt2" or tokenizer_pre != "qwen35":
                 return "scope_guard_tokenizer_identity_mismatch"

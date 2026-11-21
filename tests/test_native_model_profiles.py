@@ -23,6 +23,7 @@ from orbit.native_llama.model_profiles import (
     SCOPE_GUARD_OFFICIAL_TEMPLATE_SHA256,
     SCOPE_GUARD_PROFILE_ID,
     QWEN38_ARETE_PROFILE_ID,
+    QWEN38_TURBO_FC_PROFILE_ID,
     QWEN38_SALUKI_PROFILE_ID,
     QWEN38_SALUKI_OFFICIAL_TEMPLATE_SHA256,
     NativeModelProfile,
@@ -78,6 +79,19 @@ QWEN38_SALUKI_METADATA = {
     "tokenizer.ggml.eos_token_id": "248046",
     "tokenizer.ggml.padding_token_id": "248044",
     "tokenizer.ggml.add_bos_token": "false",
+    "qwen35.context_length": "262144",
+    "qwen35.block_count": "64",
+}
+
+QWEN38_TURBO_FC_METADATA = {
+    "general.architecture": "qwen35",
+    "general.name": "Qwen3.8 27B Brainwaves NM HERETIC BR LOA1",
+    "general.file_type": "15",
+    "tokenizer.ggml.model": "gpt2",
+    "tokenizer.ggml.pre": "qwen35",
+    "tokenizer.ggml.bos_token_id": "248044",
+    "tokenizer.ggml.eos_token_id": "248046",
+    "tokenizer.ggml.padding_token_id": "248044",
     "qwen35.context_length": "262144",
     "qwen35.block_count": "64",
 }
@@ -974,6 +988,69 @@ class NativeModelProfileTests(unittest.TestCase):
         self.assertFalse(manifest["requirements"]["thinking_supported"])
         self.assertFalse(manifest["requirements"]["route_prefix_reuse_supported"])
         self.assertFalse(manifest["requirements"]["multimodal_supported"])
+
+
+
+class Qwen38TurboFcProfileTests(unittest.TestCase):
+    def _detect(self, metadata=None, template="official-turbo-fc-template"):
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        with mock.patch(
+            "orbit.native_llama.model_profiles.QWEN38_TURBO_FC_OFFICIAL_TEMPLATE_SHA256",
+            digest,
+        ):
+            return detect_native_model_profile(metadata or QWEN38_TURBO_FC_METADATA, template)
+
+    def test_exact_gguf_and_template_identity_is_verified(self) -> None:
+        profile = self._detect()
+        self.assertEqual(profile.profile_id, QWEN38_TURBO_FC_PROFILE_ID)
+        self.assertTrue(profile.verified)
+        self.assertEqual(profile.family, "qwen3.8-turbo-fcfusion")
+        self.assertEqual(profile.verified_quantization, "Q4_K_M")
+        self.assertEqual(profile.tool_call_protocol, "qwen3.6-xml")
+
+    def test_pinned_template_is_distinct_from_the_saluki_arete_one(self) -> None:
+        from orbit.native_llama import model_profiles as mp
+
+        self.assertNotEqual(
+            mp.QWEN38_TURBO_FC_OFFICIAL_TEMPLATE_SHA256,
+            mp.QWEN38_ARETE_OFFICIAL_TEMPLATE_SHA256,
+        )
+
+    def test_cache_mtp_and_multimodal_capabilities_are_not_inherited(self) -> None:
+        profile = self._detect()
+        self.assertFalse(profile.route_prefix_reuse_supported)
+        self.assertFalse(profile.mtp_supported)
+        self.assertFalse(profile.multimodal_supported)
+
+    def test_template_or_metadata_drift_fails_closed(self) -> None:
+        self.assertFalse(
+            detect_native_model_profile(QWEN38_TURBO_FC_METADATA, "wrong-template").verified
+        )
+        for key, value in (
+            ("general.architecture", "qwen35moe"),
+            ("general.name", "Arete 27B"),
+            ("general.file_type", "20"),
+            ("tokenizer.ggml.pre", "qwen2"),
+            ("tokenizer.ggml.bos_token_id", "1"),
+            ("tokenizer.ggml.add_bos_token", "true"),
+            ("qwen35.context_length", "131072"),
+            ("qwen35.block_count", "65"),
+            ("qwen35.nextn_predict_layers", "1"),
+        ):
+            with self.subTest(key=key):
+                profile = self._detect({**QWEN38_TURBO_FC_METADATA, key: value})
+                self.assertFalse(profile.verified)
+                self.assertNotEqual(profile.profile_id, QWEN38_TURBO_FC_PROFILE_ID)
+
+    def test_drift_reports_turbo_fc_reasons(self) -> None:
+        for key, value, reason in (
+            ("tokenizer.ggml.pre", "qwen2", "qwen38_turbo_fc_tokenizer_identity_mismatch"),
+            ("general.file_type", "20", "qwen38_turbo_fc_quantization_identity_mismatch"),
+            ("qwen35.block_count", "65", "qwen38_turbo_fc_metadata_identity_mismatch"),
+        ):
+            with self.subTest(key=key):
+                profile = self._detect({**QWEN38_TURBO_FC_METADATA, key: value})
+                self.assertEqual(profile.failure_reason, reason)
 
 
 if __name__ == "__main__":

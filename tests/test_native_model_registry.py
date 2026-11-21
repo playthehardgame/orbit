@@ -74,6 +74,7 @@ class NativeModelRegistryTests(unittest.TestCase):
                 ("Qwen3.8 9B Distill", "orbit-qwen38-9b-distill-native-v1"),
                 ("ScopeGuard-2 4B", "orbit-scope-guard-v2-4b-native-v1"),
                 ("NousResearch Arete 27B", "orbit-qwen38-arete-native-v1"),
+                ("Qwen3.8 27B TurboFCFusion Heretic NEO-CODER", "orbit-qwen38-turbo-fcfusion-native-v1"),
                 ("Gemma 4 E4B Heretic", "orbit-gemma4-e4b-heretic-native-v1"),
             ],
         )
@@ -159,6 +160,11 @@ class NativeModelRegistryTests(unittest.TestCase):
                     "orbit-qwen38-arete-native-v1",
                     "bartowski/NousResearch_Arete-27B-GGUF",
                     "NousResearch_Arete-27B-Q4_K_M.gguf",
+                ),
+                (
+                    "orbit-qwen38-turbo-fcfusion-native-v1",
+                    "DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF",
+                    "Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-Q4_K_M.gguf",
                 ),
                 (
                     "orbit-gemma4-e4b-heretic-native-v1",

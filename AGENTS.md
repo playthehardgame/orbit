@@ -90,7 +90,7 @@ Three layers, cheapest first; none replaces ANALYSIS semantic qualification.
 - **Offline, every run** (`unittest discover`): `tests/test_model_matrix.py`
   (registry, verified identities, rolling-route sets and README agree) and
   `tests/test_model_capability_matrix.py` (per-profile detection, quantization,
-  mtp/route-prefix/multimodal/thinking flags and fail-closed drift, 16 profiles).
+  mtp/route-prefix/multimodal/thinking flags and fail-closed drift, 18 profiles).
   Adding a model means adding a row to both; they fail until you do.
 - **Live inspection** (needs the llama.cpp build, reads GGUF metadata, no
   weights): `python3 scripts/orbit_model_matrix.py --build-bin <bin>`.
@@ -99,7 +99,7 @@ Three layers, cheapest first; none replaces ANALYSIS semantic qualification.
   `tests/test_model_matrix_qualify.py` use fakes only. Statuses: PASS, PARTIAL
   (some fixtures not applicable), NOT_COVERED (no fixture lists the profile),
   FAIL, SKIPPED. Default fixtures: `qualification/fixtures/matrix-v1.json`, the
-  four `core-v1` fixtures made applicable to all 16 verified profiles
+  four `core-v1` fixtures made applicable to all 18 verified profiles
   (`core-v1` itself is frozen: its hash anchors historical evidence). Applicability
   is not a qualification claim; a model that fails a fixture there is a finding to
   investigate (for example `pwd_final` is known to fail on some profiles). Exit 1 on FAIL,
@@ -136,6 +136,36 @@ reuse and multimodal all OFF (the repo has an mmproj, not pinned). Added to matr
 applicability only; NOT live-qualified, no chat-quality or classification-accuracy claim.
 License is custom (`principled-intelligence-model-license`, `license:other`) and was not
 reviewed here; check it before redistributing or relying on it.
+
+### DavidAU Qwen3.8 27B TurboFCFusion Heretic NEO-CODER (added 2026-11-21, registry id `davidau-qwen38-27b-turbo-fc-q4-k-m`)
+
+Profile `orbit-qwen38-turbo-fcfusion-native-v1`, HF repo
+`DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF`,
+file `Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-Q4_K_M.gguf`
+(18,047,253,088 bytes, LFS oid prefix `cf35a030cca2c9e1` per the HF tree API; NOT downloaded in
+full, sha256 not checked locally). The repo mixes plain and MTP files; ONLY the plain
+Q4_K_M is registered. Identity pinned from the first 16 MiB (header only): `general.name`
+"Qwen3.8 27B Brainwaves NM HERETIC BR LOA1" (basename Qwen3.8, 27B), `qwen35` (llama.cpp's
+architecture id, shared by all Qwen3.5/3.8 dense models), file_type 15, 64 blocks, ctx 262144,
+eos 248046, bos/pad 248044, `add_bos_token` key ABSENT (accepted as ""/false), no
+`nextn_predict_layers` key (the profile rejects it, so an MTP file cannot match), 851 tensors,
+chat template sha256 `514d5304...e7a37` (8953 chars). The template differs from the
+Saluki/Arete one (adds `reasoning_effort`, default `xhigh`, and `preserve_thinking`; ChatML,
+Qwen XML tool calls, `<think>`); reviewed by reading the Jinja only. Header also carries
+`general.sampling.*` (temp 1.0, top_k 20, top_p 0.95); Orbit stays greedy. Everything
+capability-related is OFF: mtp, route-prefix, rolling route, multimodal (mmproj files exist in
+the repo, not pinned). Added to matrix-v1 applicability only. NOT live-qualified: no load, chat,
+tool-intent or ANALYSIS claim. The license and the "uncensored/heretic" behaviour were not
+reviewed here.
+Independent read-only review (2026-11-21, header + template read, no live run): identity pins match the
+header; the `nextn_predict_layers` key and `block_count` != 64 each exclude MTP files. Template
+notes: past assistant turns always keep a `<think>` block (`preserve_thinking` undefined), and with
+thinking ON the `xhigh` reasoning text is prepended to the system turn (the bridge sets only
+`enable_thinking`, never `reasoning_effort`), so with thinking ON the re-rendered history diverges
+from the real KV each turn (full re-prefill); qualify with thinking OFF. Expected on this host (an
+ESTIMATE from the Arete numbers, not measured): `--repack off`, threads 10-12, ctx 4096-8192, batch
+256, ubatch 128, model on ext4, peak RSS ~17.5-18 GB; with repack on ~29 GB (OOM risk); never leave
+ctx at 262144. The header's `general.sampling.*` is ignored (greedy sampler).
 
 ### NousResearch Arete 27B (added 2026-11-10, registry id `nous-arete-27b-q4-k-m`)
 

@@ -28,7 +28,7 @@ On Debian/Ubuntu with Python 3.11 or newer:
 
 ```bash
 sudo apt install git build-essential cmake python3-venv bubblewrap
-git clone https://github.com/guelfoweb/orbit.git
+git clone https://github.com/playthehardgame/orbit.git
 cd orbit
 python3 -m venv .venv
 . .venv/bin/activate

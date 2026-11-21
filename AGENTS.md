@@ -11,6 +11,12 @@ approaches (so they are not reopened), and prioritised next steps. When this fil
 and any older handoff text disagree, the ACTUAL repository (HEAD, tests, source)
 is authoritative; then this file; then release notes.
 
+## Official repository
+
+The official repository is the fork `https://github.com/playthehardgame/orbit`
+(`origin`, branch `main`). The original project `guelfoweb/orbit` is kept as the
+`upstream` remote and is only used to merge upstream changes into the fork.
+
 ## Current state (reconciled 2026-09-28)
 
 This section describes production at `ab6109743f47d391070a1ee374c5e17325db24be`

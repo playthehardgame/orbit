@@ -99,7 +99,7 @@ from orbit.native_server.protocol import (
     trim_at_stop,
     validate_session_id,
 )
-from orbit.native_server.request_logging import RequestLogger
+from orbit.native_server.request_logging import RequestLogger, run_manifest
 from orbit.runtime.analysis_runtime import ANALYSIS_SYSTEM_PROMPT, ANALYSIS_TOOL_SCHEMA
 from orbit.runtime.messages import FINAL_FROM_TOOL_SYSTEM_PROMPT, ROUTE_SYSTEM_PROMPT
 from orbit.runtime.tool_healing import tool_call_healing_status
@@ -1419,6 +1419,13 @@ def serve_until_terminated(httpd: Any) -> None:
             signal.signal(number, handler)
 
 
+def _log_server_start(request_logger: RequestLogger, args: Any, argv: list[str] | None,
+                      paths: Any, model_alias: str) -> None:
+    """First log row: the run manifest an auditor needs (model, build, env, host)."""
+    request_logger.write("server_start", log_directory=str(args.log), **run_manifest(
+        argv or [], model_path=getattr(paths, "model", None), alias=model_alias))
+
+
 def run_server(argv: list[str] | None = None, *, research_admission=None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -1709,7 +1716,7 @@ def run_server(argv: list[str] | None = None, *, research_admission=None) -> int
             client.close()
             print(f"orbit-server: cannot initialize --log {args.log}: {exc}", file=sys.stderr)
             return 2
-        request_logger.write("server_start", argv=argv or [], log_directory=str(args.log))
+        _log_server_start(request_logger, args, argv, paths, model_alias)
     httpd = ThreadingHTTPServer((args.host, args.port), OrbitNativeHandler)
     httpd.request_logger = request_logger  # type: ignore[attr-defined]
     httpd.orbit_state = OrbitNativeServer(client=client, model_alias=model_alias)  # type: ignore[attr-defined]

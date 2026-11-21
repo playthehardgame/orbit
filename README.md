@@ -277,6 +277,14 @@ context is freed and `server_stop` is logged. Shell tool output is captured up
 to 8 MiB per stream; anything beyond that is read and discarded, and a marker
 says so.
 
+With `--log DIR`, the log directory is created owner-only (`0700`) and
+`requests.jsonl` is `0600`, because prompts are logged verbatim. Its first row,
+`server_start`, is the run manifest: argv, alias, model file path/size/mtime,
+build identity, Python and host details, memory, and every `ORBIT_*` variable in
+effect (values of names containing TOKEN, KEY, SECRET, PASSWORD or CREDENTIAL are
+replaced by `[redacted]`). Set `ORBIT_AUDIT_HASH_MODEL=1` to also record the
+model file's SHA-256; this reads the whole file and delays startup accordingly.
+
 ## Development and tests
 
 For the lightweight, artifact-free [core CI gate](docs/CORE_CI.md), run:

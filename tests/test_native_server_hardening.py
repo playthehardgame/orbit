@@ -81,5 +81,53 @@ class TerminationTests(unittest.TestCase):
         self.assertEqual(seen["during"], before)
 
 
+
+class RequestGateTests(unittest.TestCase):
+    def test_refuses_past_the_limit_and_recovers(self):
+        gate = app.RequestGate(limit=2)
+        self.assertTrue(gate.try_enter())
+        self.assertTrue(gate.try_enter())
+        self.assertFalse(gate.try_enter())
+        gate.leave()
+        self.assertTrue(gate.try_enter())
+        self.assertEqual(gate.in_flight, 2)
+
+    def test_leave_never_goes_negative(self):
+        gate = app.RequestGate(limit=1)
+        gate.leave()
+        self.assertEqual(gate.in_flight, 0)
+
+    def test_limit_environment_override_and_fallback(self):
+        self.assertEqual(app.max_inflight_requests({}), app.DEFAULT_MAX_INFLIGHT_REQUESTS)
+        self.assertEqual(app.max_inflight_requests({app.MAX_INFLIGHT_ENV: "3"}), 3)
+        for bad in ("0", "-1", "x", ""):
+            self.assertEqual(app.max_inflight_requests({app.MAX_INFLIGHT_ENV: bad}),
+                             app.DEFAULT_MAX_INFLIGHT_REQUESTS, bad)
+
+    def test_http_503_when_saturated_and_health_stays_up(self):
+        import http.client
+        from http.server import ThreadingHTTPServer
+        saturated = app.RequestGate(limit=1)
+        saturated.try_enter()
+        server = ThreadingHTTPServer(("127.0.0.1", 0), app.OrbitNativeHandler)
+        server.request_logger = None
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with mock.patch.object(app, "REQUEST_GATE", saturated):
+                conn = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=5)
+                conn.request("POST", "/v1/chat/completions", body="{}",
+                             headers={"Content-Type": "application/json"})
+                self.assertEqual(conn.getresponse().status, 503)
+                conn.close()
+                conn = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=5)
+                conn.request("GET", "/health")
+                self.assertEqual(conn.getresponse().status, 200)
+                conn.close()
+        finally:
+            server.shutdown()
+            server.server_close()
+
+
 if __name__ == "__main__":
     unittest.main()

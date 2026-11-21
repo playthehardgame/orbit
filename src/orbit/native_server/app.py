@@ -556,6 +556,49 @@ class OrbitNativeServer:
         )
 
 
+MAX_INFLIGHT_ENV = "ORBIT_MAX_INFLIGHT_REQUESTS"
+DEFAULT_MAX_INFLIGHT_REQUESTS = 64
+
+
+def max_inflight_requests(environ: Mapping[str, str] | None = None) -> int:
+    """Cap on concurrent POST requests; invalid or non-positive values fall back."""
+    env = os.environ if environ is None else environ
+    try:
+        value = int(env.get(MAX_INFLIGHT_ENV, ""))
+    except ValueError:
+        return DEFAULT_MAX_INFLIGHT_REQUESTS
+    return value if value > 0 else DEFAULT_MAX_INFLIGHT_REQUESTS
+
+
+class RequestGate:
+    """Non-blocking counter of in-flight requests (limit read lazily from env)."""
+
+    def __init__(self, limit: int | None = None) -> None:
+        self._fixed = limit
+        self._lock = threading.Lock()
+        self._count = 0
+
+    def try_enter(self) -> bool:
+        limit = self._fixed if self._fixed is not None else max_inflight_requests()
+        with self._lock:
+            if self._count >= limit:
+                return False
+            self._count += 1
+            return True
+
+    def leave(self) -> None:
+        with self._lock:
+            self._count = max(0, self._count - 1)
+
+    @property
+    def in_flight(self) -> int:
+        with self._lock:
+            return self._count
+
+
+REQUEST_GATE = RequestGate()
+
+
 class OrbitNativeHandler(BaseHTTPRequestHandler):
     server_version = "orbit-server"
 
@@ -570,8 +613,17 @@ class OrbitNativeHandler(BaseHTTPRequestHandler):
             self._do_get()
 
     def do_POST(self) -> None:
-        with self._telemetry_request("POST"):
-            self._do_post()
+        # Generation is serialized behind one lock; unbounded waiters only hold
+        # threads and sockets. Refuse past the cap so a client can back off.
+        if not REQUEST_GATE.try_enter():
+            self._request_started = time.monotonic()
+            self._json({"error": "server busy, retry later"}, status=503)
+            return
+        try:
+            with self._telemetry_request("POST"):
+                self._do_post()
+        finally:
+            REQUEST_GATE.leave()
 
     def _do_get(self) -> None:
         self._request_started = time.monotonic()

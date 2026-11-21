@@ -273,7 +273,9 @@ than 64 MiB with HTTP 400 before reading the body. Set `ORBIT_MAX_REQUEST_BYTES`
 to a positive byte count to change the limit; invalid or non-positive values
 fall back to the default. `SIGTERM` and `SIGHUP` (a service stop, `kill`,
 `wsl --shutdown`) stop the server through the same path as Ctrl-C: the model
-context is freed and `server_stop` is logged. Shell tool output is captured up
+context is freed and `server_stop` is logged. At most 64 POST requests are handled or queued at once; further ones
+get HTTP 503 (`server busy`) so a client can back off, and `/health` stays
+available. `ORBIT_MAX_INFLIGHT_REQUESTS` changes the cap. Shell tool output is captured up
 to 8 MiB per stream; anything beyond that is read and discarded, and a marker
 says so.
 

@@ -29,7 +29,7 @@ the recorded SHA is an audit anchor, not a permanent expected HEAD. Untracked
   documented in [README](README.md#configuration-and-model-store). Historical
   `models/` and removed research-worktree paths are provenance, not instructions
   to recreate those directories or copy models.
-- Latest retained full-suite qualification: #391 candidate `025fb63`,
+- Retained runtime full-suite qualification anchor: #391 candidate `025fb63`,
   **6516 tests / 45 skips / RC=0**, merged with an identical tree. These counts
   belong to that run; skips depend on the host's retained artifacts. Evidence:
   `workdir/diag/finish_constraint_diagnostic_1/` and
@@ -353,6 +353,58 @@ This is NOT a substitute for the six frozen malware samples: the SHA-pinned
 cross-sample and semantic-baseline gates still need the real corpus or an explicit
 `ORBIT_ALLOW_MISSING_CORPUS=1`. The synthetic Office and string-array samples are
 minimal shapes the analyzers accept, not stand-ins for real droppers.
+
+### Subsequent tooling addendum (2026-11-15)
+
+- Model qualification contracts landed in #393 / `6a16972`: explicit technical
+  support and reasoning declarations, hash-bound per-capability observations,
+  and an isolated research admission command. Support declarations are
+  diagnostics, not a new dispatch authorization layer; CHAT observation requires
+  manual review, and no model was enabled. Contract:
+  [MODEL_RESEARCH_QUALIFICATION.md](docs/MODEL_RESEARCH_QUALIFICATION.md).
+- Repeated cache-profile membership declarations are centralized without moving
+  native state or changing cache identities, token boundaries, eligibility
+  guards, reset rules or prewarm ordering. R2–R6 remain TECHNICAL_STOP.
+- A lightweight core CI now exists. Its explicit source-fresh unittest subset
+  requires zero skips and no native/model/corpus artifacts; it does not waive
+  the frozen-corpus gate or replace full/native/model/semantic qualification.
+  Scope and local command: [CORE_CI.md](docs/CORE_CI.md). Historical statements
+  below that no CI existed retain their original date-scoped meaning.
+- Source-fresh validation of the cache/CI follow-up: **6563 tests / 47 skips /
+  RC=0**, with a separate artifact-free core run of **351 tests / zero skips**.
+  These counts belong to those runs; full-suite skips remain host-dependent.
+  Evidence: `workdir/diag/cache_policy_and_ci_1/`. This extends source regression
+  coverage, not native model or ANALYSIS semantic qualification.
+- Required-reasoning decision budgets now add a fixed 1024-token internal
+  reserve only for native profiles declaring `reasoning_behavior=always` and
+  `separated_reasoning=true`. The combined ceiling reaches exact admission;
+  optional/unknown profiles and retry counts remain unchanged. This fixes an
+  insufficient decision budget, not the model's semantic choices. Contract:
+  [MODEL_RESEARCH_QUALIFICATION.md](docs/MODEL_RESEARCH_QUALIFICATION.md).
+- **NOT QUALIFIED — Liquid LFM2.5-24B-A2B Q4_K_M tools:** the operator resumed
+  verification and then requested a ROUTE fix. Download is complete at
+  `/srv/orbit-models/LiquidAI--LFM2.5-24B-A2B-GGUF/LFM2.5-24B-A2B-Q4_K_M.gguf`;
+  14,526,258,464 bytes, SHA256
+  `d3334405b96228eb9908cdebb5c6194908f2da64282bda852afc3a3910c64e7d`.
+  Exact identity/load and five manually reviewed tools-off CHAT smokes passed.
+  The frozen 24-intent baseline passed 0/24; after the bounded reasoning fix,
+  the complete gate passed **5/24 (FAIL)**, with 10 missed executions,
+  19 invalid route/protocol outcomes and zero unwanted authorized handoffs.
+  No model-selected operation executed: the executor remained intercepted.
+  Incorrect ANALYSIS selection for script generation and incomplete/prose
+  route decisions remain visible; no prompt/parser/oracle changes, semantic
+  Python classifiers or extra retries were added to mask them. Liquid remains
+  unregistered and disabled; load/CHAT positives do not qualify ROUTE or
+  ANALYSIS semantics (not run). Preserve both evidence bundles:
+  `workdir/diag/lfm25_q4km_qualification_1/` and
+  `workdir/diag/reasoning_route_budget_1/`. Native/source identities remained
+  unchanged during the retained final probe. No additional run is implied.
+- Required-reasoning source regression: **6570 tests / 47 skips / RC=0**,
+  with **358 artifact-free core tests / zero skips**, nine applied mutants
+  caught, and independent review at BLOCKER 0 / MAJOR 0. Isolated checkouts must
+  provision the retained frozen samples hash-exact; the initial missing-corpus
+  run failed and was not accepted or waived. These source checks do not turn
+  Liquid's 5/24 tool-intent FAIL into a capability qualification.
 
 ## Historical machine-migration handoff (2026-09-13)
 

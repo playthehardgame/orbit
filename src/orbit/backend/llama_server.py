@@ -343,13 +343,27 @@ class LlamaServerBackend:
             return None
         return props.get("orbit_build") if isinstance(props, dict) else None
 
+    def requires_native_reasoning(self) -> bool:
+        # Budget information grants no production capability. Explicit research
+        # admission can report always-reasoning while remaining unverified.
+        props = self._props_or_empty()
+        compatibility = props.get("model_compatibility")
+        return bool(
+            props.get("backend") == "orbit-native"
+            and isinstance(compatibility, dict)
+            and compatibility.get("reasoning_behavior") == "always"
+            and compatibility.get("separated_reasoning") is True
+        )
+
     def uses_native_separated_reasoning(self) -> bool:
         compatibility = self._props_or_empty().get("model_compatibility")
-        return bool(
-            isinstance(compatibility, dict)
-            and compatibility.get("verified") is True
-            and compatibility.get("reasoning_protocol") == "qwen-think"
-        )
+        if not isinstance(compatibility, dict) or compatibility.get("verified") is not True:
+            return False
+        if "separated_reasoning" in compatibility:
+            return compatibility["separated_reasoning"] is True
+        # Older servers did not publish the capability. Retain their exact
+        # previously qualified behavior; an explicit refusal above wins.
+        return compatibility.get("reasoning_protocol") == "qwen-think"
 
     def execute_server_tool(self, name: str, arguments: dict[str, Any]) -> str:
         data = self._post_json("/tools", {"tool": name, "params": arguments})

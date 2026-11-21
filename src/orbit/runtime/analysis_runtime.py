@@ -2576,6 +2576,41 @@ class AnalysisWorkspace:
         (root / "work").mkdir()
         return cls(root=root)
 
+    @staticmethod
+    def sweep_stale(*, max_age_days: float = 7.0, base: Path | None = None,
+                    now: float | None = None) -> int:
+        """Remove workspaces left by processes that died without close().
+
+        Only this user's real directories named orbit-analysis-session-* whose
+        newest mtime (root, source/, work/) is older than `max_age_days` are
+        removed, so a live long-running session is never touched. Returns the
+        number removed; never raises.
+        """
+        if max_age_days <= 0:
+            return 0
+        directory = Path(tempfile.gettempdir()) if base is None else base
+        cutoff = (time.time() if now is None else now) - max_age_days * 86400
+        removed = 0
+        try:
+            candidates = list(directory.glob("orbit-analysis-session-*"))
+        except OSError:
+            return 0
+        for path in candidates:
+            try:
+                info = path.lstat()
+                if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid()
+                        or path.is_symlink()):
+                    continue
+                newest = max([info.st_mtime] + [
+                    (path / sub).lstat().st_mtime for sub in ("source", "work")
+                    if (path / sub).exists()])
+                if newest < cutoff:
+                    shutil.rmtree(path, ignore_errors=True)
+                    removed += 1
+            except OSError:
+                continue
+        return removed
+
     @property
     def source_root(self) -> Path:
         return self.root / "source"

@@ -1413,6 +1413,25 @@ def _raise_keyboard_interrupt(signum: int, frame: Any) -> None:
     raise KeyboardInterrupt
 
 
+ANALYSIS_SWEEP_DAYS_ENV = "ORBIT_ANALYSIS_SWEEP_DAYS"
+
+
+def _sweep_stale_workspaces() -> None:
+    """Remove analysis workspaces abandoned by crashed or killed processes.
+    ORBIT_ANALYSIS_SWEEP_DAYS sets the age threshold (default 7, 0 disables)."""
+    try:
+        days = float(os.environ.get(ANALYSIS_SWEEP_DAYS_ENV, "7"))
+    except ValueError:
+        days = 7.0
+    try:
+        from orbit.runtime.analysis_runtime import AnalysisWorkspace
+        removed = AnalysisWorkspace.sweep_stale(max_age_days=days)
+    except Exception:  # housekeeping must never stop a server from starting
+        return
+    if removed:
+        _startup_note(f"removed {removed} stale analysis workspace(s) older than {days:g} day(s)")
+
+
 def serve_until_terminated(httpd: Any) -> None:
     """serve_forever that also stops cleanly on SIGTERM/SIGHUP.
 
@@ -1420,6 +1439,7 @@ def serve_until_terminated(httpd: Any) -> None:
     shutdown path (stop route shadow, free the model context, log server_stop)
     is skipped. Handlers are only installed from the main thread and restored.
     """
+    _sweep_stale_workspaces()
     previous: dict[int, Any] = {}
     if threading.current_thread() is threading.main_thread():
         for name in ("SIGTERM", "SIGHUP"):

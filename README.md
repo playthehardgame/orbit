@@ -285,6 +285,11 @@ effect (values of names containing TOKEN, KEY, SECRET, PASSWORD or CREDENTIAL ar
 replaced by `[redacted]`). Set `ORBIT_AUDIT_HASH_MODEL=1` to also record the
 model file's SHA-256; this reads the whole file and delays startup accordingly.
 
+At startup the server removes analysis workspaces (`orbit-analysis-session-*` in
+the temporary directory, owned by the same user) that a crashed or killed
+process left behind and that have not been modified for 7 days. Set
+`ORBIT_ANALYSIS_SWEEP_DAYS` to change the threshold; `0` disables the sweep.
+
 ## Development and tests
 
 For the lightweight, artifact-free [core CI gate](docs/CORE_CI.md), run:

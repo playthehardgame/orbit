@@ -6,6 +6,7 @@ import signal
 import threading
 import time
 import unittest
+from unittest import mock
 
 from orbit.native_server import app
 
@@ -46,6 +47,12 @@ class _BlockingServer:
 
 @unittest.skipUnless(hasattr(signal, "SIGTERM"), "POSIX signals required")
 class TerminationTests(unittest.TestCase):
+    def setUp(self):
+        # Never sweep the developer's real temporary directory from a test.
+        patcher = mock.patch.object(app, "_sweep_stale_workspaces")
+        self.sweep = patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_sigterm_stops_serving_and_restores_handlers(self):
         before = signal.getsignal(signal.SIGTERM)
         timer = threading.Timer(0.2, os.kill, (os.getpid(), signal.SIGTERM))
@@ -58,6 +65,7 @@ class TerminationTests(unittest.TestCase):
             timer.cancel()
         self.assertLess(time.monotonic() - started, 5)
         self.assertEqual(signal.getsignal(signal.SIGTERM), before)
+        self.sweep.assert_called_once_with()
 
     def test_off_main_thread_installs_nothing(self):
         before = signal.getsignal(signal.SIGTERM)

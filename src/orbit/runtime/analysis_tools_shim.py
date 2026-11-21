@@ -13,7 +13,8 @@ scratch directory, so a host round-trip would add a channel to defend
 without adding a defence. The shim is plain Python doing plain reads.
 
 `read_file` reads the artifact or scratch. `read_evidence` reads only the
-runtime's bounded, re-attested transform copies supplied for this action.
+runtime's bounded, re-attested transforms and source-acquisition output supplied
+for this action.
 Neither exposes the EvidenceStore or a host service. No search or command
 runner is provided.
 
@@ -54,13 +55,15 @@ def _safe_path(value):
 
 
 def read_evidence(evidence_id):
-    """Return one authorized transform's complete exact UTF-8 text.
+    """Return one runtime-authorized evidence input's exact UTF-8 text.
 
     The runtime supplies bounded immutable values, never EvidenceStore paths.
     Availability here is not a claim that the model received these bytes.
     """
+    if isinstance(evidence_id, str) and evidence_id.startswith("evidence:"):
+        evidence_id = evidence_id[len("evidence:"):]
     if not isinstance(evidence_id, str) or evidence_id not in _EVIDENCE_INPUTS:
-        raise ValueError("evidence not available to this action; use a registered transform id (not a path)")
+        raise ValueError("evidence not available to this action; use an authorized evidence id (not a path)")
     return _EVIDENCE_INPUTS[evidence_id]
 
 

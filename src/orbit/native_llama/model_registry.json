@@ -17,9 +17,7 @@
       "mmproj": {
         "repo": "ggml-org/gemma-4-26B-A4B-it-GGUF",
         "file": "mmproj-gemma-4-26B-A4B-it-Q8_0.gguf",
-        "cache_glob": "models--ggml-org--gemma-4-26B-A4B-it-GGUF/snapshots/*/mmproj-gemma-4-26B-A4B-it-Q8_0.gguf",
-        "size": 806408320,
-        "sha256": "cc4e855736da450bf1e162d8cccfe0ad685727d0c9e04ef7dd8d884f3121039b"
+        "cache_glob": "models--ggml-org--gemma-4-26B-A4B-it-GGUF/snapshots/*/mmproj-gemma-4-26B-A4B-it-Q8_0.gguf"
       },
       "mtp": {
         "enabled_by_default": true,

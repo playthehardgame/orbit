@@ -70,7 +70,8 @@ class ExpertUsageTests(unittest.TestCase):
         server.lock = mock.MagicMock()
         server.moe_expert_usage_status()
         server.reset_moe_expert_usage()
-        self.assertEqual(server.lock.__enter__.call_count, 2)
+        self.assertEqual(server.lock.acquire.call_count, 2)
+        self.assertEqual(server.lock.release.call_count, 2)
 
     def test_diagnostic_endpoints_are_thin_read_only_adapters(self) -> None:
         state = mock.Mock()

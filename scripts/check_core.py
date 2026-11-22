@@ -24,6 +24,14 @@ MODULES = (
     "tests.test_cache_profile_policy",
     "tests.test_core_checks",
     "tests.test_reasoning_decision_budget",
+    # Hardening and structural gates (all artifact-free and fast).
+    "tests.test_architecture",
+    "tests.test_host_class",
+    "tests.test_memory_guard",
+    "tests.test_native_server_hardening",
+    "tests.test_request_log_framework",
+    "tests.test_model_download_integrity",
+    "tests.test_sbom",
 )
 
 

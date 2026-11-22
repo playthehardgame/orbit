@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import shutil
 import tempfile
 import unittest
 
@@ -370,3 +371,52 @@ class Qwen38RegistryTests(unittest.TestCase):
         ):
             with self.subTest(model_id=model_id):
                 self.assertEqual(get_manifest(model_id).profile_id, profile_id)
+
+
+class RegistryIntegrityPinTests(unittest.TestCase):
+    _HEX = set("0123456789abcdef")
+    _PACKAGED = Path(__file__).resolve().parents[1] / "src/orbit/native_llama/model_registry.json"
+
+    def _specs(self):
+        data = json.loads(self._PACKAGED.read_text(encoding="utf-8"))
+        for model in data["models"]:
+            for kind in ("target", "mmproj", "mtp"):
+                if kind in model:
+                    yield f"{model['id']}.{kind}", model[kind]
+
+    def test_packaged_pins_are_well_formed_and_registry_loads(self) -> None:
+        self.assertTrue(load_registry())
+        pinned = 0
+        for label, spec in self._specs():
+            with self.subTest(spec=label):
+                # size and sha256 are pinned together or not at all.
+                self.assertEqual("size" in spec, "sha256" in spec)
+                if "size" in spec:
+                    pinned += 1
+                    self.assertIs(type(spec["size"]), int)
+                    self.assertGreater(spec["size"], 0)
+                    self.assertEqual(len(spec["sha256"]), 64)
+                    self.assertLessEqual(set(spec["sha256"]), self._HEX)
+        self.assertGreater(pinned, 0)
+
+    def _write_registry(self, data: dict) -> Path:
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        path = tmp / "registry.json"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        return path
+
+    def test_target_and_mtp_accept_valid_pins(self) -> None:
+        data = _registry_data()
+        data["models"][0]["target"].update(size=10, sha256="a" * 64)
+        data["models"][0]["mtp"].update(size=10, sha256="b" * 64)
+        self.assertEqual(len(load_registry(self._write_registry(data))), 1)
+
+    def test_malformed_pins_are_rejected(self) -> None:
+        for pins in ({"size": 0}, {"size": "5"}, {"size": True}, {"sha256": "A" * 64}, {"sha256": "ab"}):
+            for kind in ("target", "mtp"):
+                with self.subTest(pins=pins, kind=kind):
+                    data = _registry_data()
+                    data["models"][0][kind].update(pins)
+                    with self.assertRaises(ValueError):
+                        load_registry(self._write_registry(data))

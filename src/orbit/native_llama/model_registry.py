@@ -301,10 +301,12 @@ def _validate_registry(data: Any) -> list[dict[str, Any]]:
 
 def _validate_file_spec(value: Any, label: str) -> dict[str, Any]:
     spec = _require_mapping(value, label)
-    _require_keys(spec, required={"repo", "file", "cache_glob"}, optional=set(), label=label)
-    repo = _require_string(spec, "repo", label)
-    file_name = _require_string(spec, "file", label)
-    cache_glob = _require_string(spec, "cache_glob", label)
+    _validate_pins(spec, label)
+    base = {key: spec[key] for key in spec if key not in _PIN_KEYS}
+    _require_keys(base, required={"repo", "file", "cache_glob"}, optional=set(), label=label)
+    repo = _require_string(base, "repo", label)
+    file_name = _require_string(base, "file", label)
+    cache_glob = _require_string(base, "cache_glob", label)
     repo_parts = repo.split("/")
     if len(repo_parts) != 2 or any(part in {"", ".", ".."} for part in repo_parts):
         raise ValueError(f"{label}.repo must be owner/repository")
@@ -313,20 +315,23 @@ def _validate_file_spec(value: Any, label: str) -> dict[str, Any]:
     return spec
 
 
-def _validate_mmproj_spec(value: Any, label: str) -> dict[str, Any]:
-    spec = _require_mapping(value, label)
-    pins = {key: spec[key] for key in ("size", "sha256") if key in spec}
-    base = {key: spec[key] for key in spec if key not in pins}
-    _validate_file_spec(base, label)
-    if "size" in pins and (type(pins["size"]) is not int or pins["size"] <= 0):
+_PIN_KEYS = ("size", "sha256")
+
+
+def _validate_pins(spec: dict[str, Any], label: str) -> None:
+    """Optional integrity pins (byte size and lowercase sha256) of a file spec."""
+    if "size" in spec and (type(spec["size"]) is not int or spec["size"] <= 0):
         raise ValueError(f"{label}.size must be a positive integer")
-    if "sha256" in pins and (
-        not isinstance(pins["sha256"], str)
-        or len(pins["sha256"]) != 64
-        or any(ch not in "0123456789abcdef" for ch in pins["sha256"])
+    if "sha256" in spec and (
+        not isinstance(spec["sha256"], str)
+        or len(spec["sha256"]) != 64
+        or any(ch not in "0123456789abcdef" for ch in spec["sha256"])
     ):
         raise ValueError(f"{label}.sha256 must be 64 lowercase hex characters")
-    return spec
+
+
+def _validate_mmproj_spec(value: Any, label: str) -> dict[str, Any]:
+    return _validate_file_spec(value, label)
 
 
 def _validate_mtp_spec(value: Any, label: str) -> dict[str, Any]:
@@ -334,11 +339,11 @@ def _validate_mtp_spec(value: Any, label: str) -> dict[str, Any]:
     _require_keys(
         spec,
         required={"repo", "file", "cache_glob", "enabled_by_default", "required", "spec_type"},
-        optional=set(),
+        optional=set(_PIN_KEYS),
         label=label,
     )
     _validate_file_spec(
-        {key: spec[key] for key in ("repo", "file", "cache_glob")},
+        {key: spec[key] for key in ("repo", "file", "cache_glob", *_PIN_KEYS) if key in spec},
         label,
     )
     if type(spec["enabled_by_default"]) is not bool or type(spec["required"]) is not bool:

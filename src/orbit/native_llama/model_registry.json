@@ -10,12 +10,16 @@
       "target": {
         "repo": "ggml-org/gemma-4-26B-A4B-it-GGUF",
         "file": "gemma-4-26B-A4B-it-Q4_0.gguf",
-        "cache_glob": "models--ggml-org--gemma-4-26B-A4B-it-GGUF/snapshots/*/gemma-4-26B-A4B-it-Q4_0.gguf"
+        "cache_glob": "models--ggml-org--gemma-4-26B-A4B-it-GGUF/snapshots/*/gemma-4-26B-A4B-it-Q4_0.gguf",
+        "size": 14618145824,
+        "sha256": "d208665ab1cd3a69f7a9a4bc59430e8448c8093d9b06334f566ac59d6d504a03"
       },
       "mmproj": {
         "repo": "ggml-org/gemma-4-26B-A4B-it-GGUF",
         "file": "mmproj-gemma-4-26B-A4B-it-Q8_0.gguf",
-        "cache_glob": "models--ggml-org--gemma-4-26B-A4B-it-GGUF/snapshots/*/mmproj-gemma-4-26B-A4B-it-Q8_0.gguf"
+        "cache_glob": "models--ggml-org--gemma-4-26B-A4B-it-GGUF/snapshots/*/mmproj-gemma-4-26B-A4B-it-Q8_0.gguf",
+        "size": 806408320,
+        "sha256": "cc4e855736da450bf1e162d8cccfe0ad685727d0c9e04ef7dd8d884f3121039b"
       },
       "mtp": {
         "enabled_by_default": true,
@@ -23,7 +27,9 @@
         "spec_type": "draft-mtp",
         "repo": "ggml-org/gemma-4-26B-A4B-it-GGUF",
         "file": "mtp-gemma-4-26B-A4B-it-Q4_0.gguf",
-        "cache_glob": "models--ggml-org--gemma-4-26B-A4B-it-GGUF/snapshots/*/mtp-gemma-4-26B-A4B-it-Q4_0.gguf"
+        "cache_glob": "models--ggml-org--gemma-4-26B-A4B-it-GGUF/snapshots/*/mtp-gemma-4-26B-A4B-it-Q4_0.gguf",
+        "size": 251939520,
+        "sha256": "e00b0ce326d03d8f6f6972ad2320fe90b6ff25a3da5fc51bec15efe283052aa2"
       }
     },
     {
@@ -35,7 +41,9 @@
       "target": {
         "repo": "ggml-org/Qwen3.6-35B-A3B-GGUF",
         "file": "Qwen3.6-35B-A3B-Q4_K_M.gguf",
-        "cache_glob": "models--ggml-org--Qwen3.6-35B-A3B-GGUF/snapshots/*/Qwen3.6-35B-A3B-Q4_K_M.gguf"
+        "cache_glob": "models--ggml-org--Qwen3.6-35B-A3B-GGUF/snapshots/*/Qwen3.6-35B-A3B-Q4_K_M.gguf",
+        "size": 20542732576,
+        "sha256": "f4ffe03c9139e6a905a5d346f77d9fabdd179367c3280dfd005d1e75ca5ed8c8"
       }
     },
     {
@@ -59,7 +67,9 @@
       "target": {
         "repo": "ornith-ai/Ornith-1.5-35B-A3B-GGUF",
         "file": "Ornith-1.5-35B-Q4_K_M.gguf",
-        "cache_glob": "models--ornith-ai--Ornith-1.5-35B-A3B-GGUF/snapshots/*/Ornith-1.5-35B-Q4_K_M.gguf"
+        "cache_glob": "models--ornith-ai--Ornith-1.5-35B-A3B-GGUF/snapshots/*/Ornith-1.5-35B-Q4_K_M.gguf",
+        "size": 21713463040,
+        "sha256": "42739874cc2ccfdb8523b23fbe52e29b2a7555c8176737ca9ca0b5d59859d41f"
       }
     },
     {
@@ -71,7 +81,9 @@
       "target": {
         "repo": "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF",
         "file": "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf",
-        "cache_glob": "models--unsloth--Qwen3-Coder-30B-A3B-Instruct-GGUF/snapshots/*/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
+        "cache_glob": "models--unsloth--Qwen3-Coder-30B-A3B-Instruct-GGUF/snapshots/*/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf",
+        "size": 18556689568,
+        "sha256": "fadc3e5f8d42bf7e894a785b05082e47daee4df26680389817e2093056f088ad"
       }
     },
     {
@@ -95,7 +107,9 @@
       "target": {
         "repo": "unsloth/LFM2.5-8B-A1B-GGUF",
         "file": "LFM2.5-8B-A1B-UD-Q4_K_M.gguf",
-        "cache_glob": "models--unsloth--LFM2.5-8B-A1B-GGUF/snapshots/*/LFM2.5-8B-A1B-UD-Q4_K_M.gguf"
+        "cache_glob": "models--unsloth--LFM2.5-8B-A1B-GGUF/snapshots/*/LFM2.5-8B-A1B-UD-Q4_K_M.gguf",
+        "size": 5322223200,
+        "sha256": "e2c8350d5e6e7c633b2ba4e20805a2c86bc46884cd285e8f3fe36ad917b772c7"
       }
     },
     {
@@ -107,7 +121,9 @@
       "target": {
         "repo": "unsloth/LFM2.5-8B-A1B-GGUF",
         "file": "LFM2.5-8B-A1B-Q8_0.gguf",
-        "cache_glob": "models--unsloth--LFM2.5-8B-A1B-GGUF/snapshots/*/LFM2.5-8B-A1B-Q8_0.gguf"
+        "cache_glob": "models--unsloth--LFM2.5-8B-A1B-GGUF/snapshots/*/LFM2.5-8B-A1B-Q8_0.gguf",
+        "size": 9010196064,
+        "sha256": "ec11666b6129f0b4fe893760b66797f22e1c478a561b40e365f2b6930729b8d2"
       }
     },
     {
@@ -119,7 +135,9 @@
       "target": {
         "repo": "unsloth/LFM2.5-8B-A1B-GGUF",
         "file": "LFM2.5-8B-A1B-UD-Q6_K.gguf",
-        "cache_glob": "models--unsloth--LFM2.5-8B-A1B-GGUF/snapshots/*/LFM2.5-8B-A1B-UD-Q6_K.gguf"
+        "cache_glob": "models--unsloth--LFM2.5-8B-A1B-GGUF/snapshots/*/LFM2.5-8B-A1B-UD-Q6_K.gguf",
+        "size": 7088287328,
+        "sha256": "f5c60637503fcbb479275b1bca9358a315ca5916556f1eeed40013da45a914c3"
       }
     },
     {
@@ -131,7 +149,9 @@
       "target": {
         "repo": "bartowski/MiniCPM5-2B-GGUF",
         "file": "MiniCPM5-2B-Q4_K_M.gguf",
-        "cache_glob": "models--bartowski--MiniCPM5-2B-GGUF/snapshots/*/MiniCPM5-2B-Q4_K_M.gguf"
+        "cache_glob": "models--bartowski--MiniCPM5-2B-GGUF/snapshots/*/MiniCPM5-2B-Q4_K_M.gguf",
+        "size": 1615826144,
+        "sha256": "967d467b5a73f2def7f339f8ad724a984fe1caa323006577cd9c26adb755f0de"
       }
     },
     {
@@ -143,7 +163,9 @@
       "target": {
         "repo": "ibm-granite/granite-4.2-3b-GGUF",
         "file": "granite-4.2-3b-Q4_K_M.gguf",
-        "cache_glob": "models--ibm-granite--granite-4.2-3b-GGUF/snapshots/*/granite-4.2-3b-Q4_K_M.gguf"
+        "cache_glob": "models--ibm-granite--granite-4.2-3b-GGUF/snapshots/*/granite-4.2-3b-Q4_K_M.gguf",
+        "size": 2244011552,
+        "sha256": "e0406663965846ae22a403456eb826ccce5f450840491f71952f18a7cb78e7d5"
       }
     },
     {
@@ -155,7 +177,9 @@
       "target": {
         "repo": "ibm-granite/granite-4.2-8b-GGUF",
         "file": "granite-4.2-8b-Q4_K_M.gguf",
-        "cache_glob": "models--ibm-granite--granite-4.2-8b-GGUF/snapshots/*/granite-4.2-8b-Q4_K_M.gguf"
+        "cache_glob": "models--ibm-granite--granite-4.2-8b-GGUF/snapshots/*/granite-4.2-8b-Q4_K_M.gguf",
+        "size": 5347917952,
+        "sha256": "16a9369d0805f80b7377d25d87f937a90c05dc04ad79173a52001e42c9aab311"
       }
     },
     {
@@ -167,7 +191,9 @@
       "target": {
         "repo": "ConwayResearch/Underdog-Saluki-27B-1.0",
         "file": "Underdog-Saluki-27B-1.0-IQ2-mix.gguf",
-        "cache_glob": "models--ConwayResearch--Underdog-Saluki-27B-1.0/snapshots/*/Underdog-Saluki-27B-1.0-IQ2-mix.gguf"
+        "cache_glob": "models--ConwayResearch--Underdog-Saluki-27B-1.0/snapshots/*/Underdog-Saluki-27B-1.0-IQ2-mix.gguf",
+        "size": 7898369152,
+        "sha256": "4a673518b11b1c4445f9b9a9d3c40356f5ba39f6a6260dcb25f3fbfd475d9efb"
       }
     },
     {
@@ -179,7 +205,9 @@
       "target": {
         "repo": "empero-ai/Qwen3.8-9B-Distill-GGUF",
         "file": "Qwen3.8-9B-Q4_K_M.gguf",
-        "cache_glob": "models--empero-ai--Qwen3.8-9B-Distill-GGUF/snapshots/*/Qwen3.8-9B-Q4_K_M.gguf"
+        "cache_glob": "models--empero-ai--Qwen3.8-9B-Distill-GGUF/snapshots/*/Qwen3.8-9B-Q4_K_M.gguf",
+        "size": 5780090176,
+        "sha256": "df13d66021cef676f82be74053220fd75af6bf2a6a7fb77f5222ab9e50744a7a"
       }
     },
     {
@@ -191,7 +219,9 @@
       "target": {
         "repo": "mradermacher/scope-guard-v2-4B-q-2609-GGUF",
         "file": "scope-guard-v2-4B-q-2609.Q8_0.gguf",
-        "cache_glob": "models--mradermacher--scope-guard-v2-4B-q-2609-GGUF/snapshots/*/scope-guard-v2-4B-q-2609.Q8_0.gguf"
+        "cache_glob": "models--mradermacher--scope-guard-v2-4B-q-2609-GGUF/snapshots/*/scope-guard-v2-4B-q-2609.Q8_0.gguf",
+        "size": 4610581408,
+        "sha256": "a80af72696ac02233a7fbd2d95aef91ac5a6afe7997ea9e630fc4206a5156a74"
       }
     },
     {
@@ -203,7 +233,9 @@
       "target": {
         "repo": "bartowski/NousResearch_Arete-27B-GGUF",
         "file": "NousResearch_Arete-27B-Q4_K_M.gguf",
-        "cache_glob": "models--bartowski--NousResearch_Arete-27B-GGUF/snapshots/*/NousResearch_Arete-27B-Q4_K_M.gguf"
+        "cache_glob": "models--bartowski--NousResearch_Arete-27B-GGUF/snapshots/*/NousResearch_Arete-27B-Q4_K_M.gguf",
+        "size": 17203416064,
+        "sha256": "6f186a1fe0c4f741acb3a35b5df96bc2fc7279651f48500246e56079418f091b"
       },
       "mmproj": {
         "repo": "bartowski/NousResearch_Arete-27B-GGUF",
@@ -222,7 +254,9 @@
       "target": {
         "repo": "DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF",
         "file": "Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-Q4_K_M.gguf",
-        "cache_glob": "models--DavidAU--Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF/snapshots/*/Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-Q4_K_M.gguf"
+        "cache_glob": "models--DavidAU--Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF/snapshots/*/Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-Q4_K_M.gguf",
+        "size": 18047253088,
+        "sha256": "cf35a030cca2c9e1c55f05d697e8b9aff4885d5f65f0d0a502d2432d3d56edb2"
       }
     },
     {
@@ -234,12 +268,16 @@
       "target": {
         "repo": "llmfan46/gemma-4-E4B-it-ultra-uncensored-heretic-GGUF",
         "file": "gemma-4-E4B-it-ultra-uncensored-heretic-Q4_K_M.gguf",
-        "cache_glob": "models--llmfan46--gemma-4-E4B-it-ultra-uncensored-heretic-GGUF/snapshots/*/gemma-4-E4B-it-ultra-uncensored-heretic-Q4_K_M.gguf"
+        "cache_glob": "models--llmfan46--gemma-4-E4B-it-ultra-uncensored-heretic-GGUF/snapshots/*/gemma-4-E4B-it-ultra-uncensored-heretic-Q4_K_M.gguf",
+        "size": 5335289696,
+        "sha256": "f9dbbe3bdf396f65aec4e801516a1b868a510d96225417a8aa06763e3c5b97dc"
       },
       "mmproj": {
         "repo": "llmfan46/gemma-4-E4B-it-ultra-uncensored-heretic-GGUF",
         "file": "gemma-4-E4B-it-mmproj-BF16.gguf",
-        "cache_glob": "models--llmfan46--gemma-4-E4B-it-ultra-uncensored-heretic-GGUF/snapshots/*/gemma-4-E4B-it-mmproj-BF16.gguf"
+        "cache_glob": "models--llmfan46--gemma-4-E4B-it-ultra-uncensored-heretic-GGUF/snapshots/*/gemma-4-E4B-it-mmproj-BF16.gguf",
+        "size": 991552000,
+        "sha256": "ffa64aebf7144bbadd5a1e143b77794d88e76a81cc0168d91de0770eb49e88e0"
       }
     }
   ]

@@ -20,6 +20,14 @@ from orbit.native_llama.model_registry import (
 
 
 class NativeModelDownloadTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # These tests download tiny stand-in payloads for real registry names;
+        # pin enforcement has its own tests (test_model_download_integrity).
+        from unittest import mock
+        patcher = mock.patch("orbit.native_llama.model_download.registry_pins", return_value={})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_project_root_models_dir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

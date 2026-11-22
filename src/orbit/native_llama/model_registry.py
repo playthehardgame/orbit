@@ -232,6 +232,21 @@ def load_registry(path: Path | None = None) -> list[ModelManifest]:
     return [_manifest(item) for item in model_data]
 
 
+def registry_pins(path: Path | None = None) -> "dict[tuple[str, str], tuple[int | None, str | None]]":
+    """``{(repo, file): (size, sha256)}`` for every pinned file spec of the registry."""
+    if path is None:
+        text = resources.files(__package__).joinpath(REGISTRY_RESOURCE).read_text(encoding="utf-8")
+    else:
+        text = path.read_text(encoding="utf-8")
+    pins: dict[tuple[str, str], tuple[int | None, str | None]] = {}
+    for item in _validate_registry(_load_json(text)):
+        for key in ("target", "mmproj", "mtp"):
+            spec = item.get(key)
+            if isinstance(spec, dict) and ("size" in spec or "sha256" in spec):
+                pins[(spec["repo"], spec["file"])] = (spec.get("size"), spec.get("sha256"))
+    return pins
+
+
 def _load_json(text: str) -> Any:
     def object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
         result: dict[str, Any] = {}

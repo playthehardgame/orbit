@@ -20,6 +20,7 @@ from orbit.native_llama.model_registry import (
     effective_models_dir,
     load_registry,
     local_model_path,
+    registry_pins,
 )
 
 
@@ -101,7 +102,47 @@ def download_model(
         return DownloadResult(path=destination, downloaded=False, url=url, shards=(destination,))
 
     fetch_resumable(url, destination, opener=opener, progress=progress)
+    verify_pinned_download(destination, request.repo, request.file)
     return DownloadResult(path=destination, downloaded=True, url=url, shards=(destination,))
+
+
+class IntegrityError(RuntimeError):
+    """A downloaded file does not match the size/sha256 pinned in the registry."""
+
+
+def sha256_file(path: Path, *, chunk: int = 8 << 20) -> str:
+    import hashlib
+
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            block = handle.read(chunk)
+            if not block:
+                return digest.hexdigest()
+            digest.update(block)
+
+
+def verify_pinned_download(path: Path, repo: str, file: str, *, pins=None) -> bool:
+    """Check a freshly downloaded file against its registry pin.
+
+    Returns True when a pin existed and matched, False when the file is not
+    pinned (nothing to check). On a mismatch the file is deleted, so a corrupt or
+    substituted model can never be mistaken for a finished download, and
+    `IntegrityError` is raised.
+    """
+    pinned = (registry_pins() if pins is None else pins).get((repo, file))
+    if pinned is None:
+        return False
+    size, digest = pinned
+    problem = None
+    if size is not None and path.stat().st_size != size:
+        problem = f"size {path.stat().st_size} != pinned {size}"
+    elif digest is not None and sha256_file(path) != digest:
+        problem = "sha256 does not match the registry pin"
+    if problem:
+        path.unlink(missing_ok=True)
+        raise IntegrityError(f"{repo}/{file}: {problem}; the file was removed")
+    return True
 
 
 # --- split GGUF sets ---------------------------------------------------------

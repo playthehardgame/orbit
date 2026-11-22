@@ -412,7 +412,22 @@ def verified_native_model_identity(profile_id: str) -> VerifiedNativeModelIdenti
     )
 
 
-def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> NativeModelProfile:
+@dataclass(frozen=True)
+class _Probe:
+    """Normalized inputs shared by every ordered identity matcher."""
+
+    architecture: str
+    tokenizer_model: str
+    tokenizer_pre: str
+    model_name: str
+    file_type: str
+    template_hash: str
+    metadata: Mapping[str, str]
+    template: str
+    gemma4_e_series: bool
+
+
+def _build_probe(metadata: Mapping[str, str], template: str) -> _Probe:
     architecture = metadata.get("general.architecture", "").strip().lower()
     tokenizer_model = metadata.get("tokenizer.ggml.model", "").strip().lower()
     tokenizer_pre = metadata.get("tokenizer.ggml.pre", "").strip().lower()
@@ -426,6 +441,26 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
         architecture == "gemma4"
         and metadata.get("gemma4.embedding_length_per_layer_input", "").strip() not in ("", "0")
     ) or model_name == GEMMA4_E4B_HERETIC_VERIFIED_MODEL_NAME
+    return _Probe(
+        architecture=architecture,
+        tokenizer_model=tokenizer_model,
+        tokenizer_pre=tokenizer_pre,
+        model_name=model_name,
+        file_type=file_type,
+        template_hash=template_hash,
+        metadata=metadata,
+        template=template,
+        gemma4_e_series=gemma4_e_series,
+    )
+
+
+def _match_gemma4_e4b_heretic(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    model_name = probe.model_name
+    file_type = probe.file_type
+    template_hash = probe.template_hash
+    metadata = probe.metadata
     gemma4_e4b_heretic_identity = (
         architecture == "gemma4"
         and model_name == GEMMA4_E4B_HERETIC_VERIFIED_MODEL_NAME
@@ -461,7 +496,15 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             route_prefix_reuse_supported=False,
             multimodal_supported=True,
         )
+    return None
 
+
+def _match_gemma4(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    model_name = probe.model_name
+    template_hash = probe.template_hash
+    gemma4_e_series = probe.gemma4_e_series
     if (
         architecture == "gemma4"
         and tokenizer_model == "gemma4"
@@ -488,7 +531,16 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             route_prefix_reuse_supported=True,
             multimodal_supported=True,
         )
+    return None
 
+
+def _match_qwen36(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    tokenizer_pre = probe.tokenizer_pre
+    model_name = probe.model_name
+    file_type = probe.file_type
+    template_hash = probe.template_hash
     qwen_identity = (
         architecture == "qwen35moe"
         and model_name == QWEN36_VERIFIED_MODEL_NAME
@@ -520,7 +572,17 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             verified_quantization=QWEN36_VERIFIED_QUANTIZATION,
             route_prefix_reuse_supported=True,
         )
+    return None
 
+
+def _match_ornith15(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    tokenizer_pre = probe.tokenizer_pre
+    model_name = probe.model_name
+    file_type = probe.file_type
+    template_hash = probe.template_hash
+    metadata = probe.metadata
     ornith15_identity = (
         architecture == "qwen35moe"
         and model_name == ORNITH15_VERIFIED_MODEL_NAME
@@ -564,7 +626,17 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             verified_quantization=ORNITH15_VERIFIED_QUANTIZATION,
             route_prefix_reuse_supported=True,
         )
+    return None
 
+
+def _match_qwen38(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    tokenizer_pre = probe.tokenizer_pre
+    model_name = probe.model_name
+    file_type = probe.file_type
+    template_hash = probe.template_hash
+    metadata = probe.metadata
     qwen38_identity = (
         architecture == "qwen35"
         and model_name == QWEN38_VERIFIED_MODEL_NAME
@@ -604,7 +676,17 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             verified_quantization=QWEN38_VERIFIED_QUANTIZATION,
             route_prefix_reuse_supported=True,
         )
+    return None
 
+
+def _match_qwen38_saluki(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    tokenizer_pre = probe.tokenizer_pre
+    model_name = probe.model_name
+    file_type = probe.file_type
+    template_hash = probe.template_hash
+    metadata = probe.metadata
     qwen38_saluki_identity = (
         architecture == "qwen35"
         and model_name == QWEN38_SALUKI_VERIFIED_MODEL_NAME
@@ -640,7 +722,17 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             verified_quantization=QWEN38_SALUKI_VERIFIED_QUANTIZATION,
             route_prefix_reuse_supported=False,
         )
+    return None
 
+
+def _match_qwen38_arete(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    tokenizer_pre = probe.tokenizer_pre
+    model_name = probe.model_name
+    file_type = probe.file_type
+    template_hash = probe.template_hash
+    metadata = probe.metadata
     qwen38_arete_identity = (
         architecture == "qwen35"
         and model_name == QWEN38_ARETE_VERIFIED_MODEL_NAME
@@ -677,7 +769,17 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             route_prefix_reuse_supported=True,
             multimodal_supported=True,
         )
+    return None
 
+
+def _match_qwen38_turbo_fc(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    tokenizer_pre = probe.tokenizer_pre
+    model_name = probe.model_name
+    file_type = probe.file_type
+    template_hash = probe.template_hash
+    metadata = probe.metadata
     qwen38_turbo_fc_identity = (
         architecture == "qwen35"
         and model_name == QWEN38_TURBO_FC_VERIFIED_MODEL_NAME
@@ -714,7 +816,17 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             verified_quantization=QWEN38_TURBO_FC_VERIFIED_QUANTIZATION,
             route_prefix_reuse_supported=False,
         )
+    return None
 
+
+def _match_qwen38_9b_distill(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    tokenizer_pre = probe.tokenizer_pre
+    model_name = probe.model_name
+    file_type = probe.file_type
+    template_hash = probe.template_hash
+    metadata = probe.metadata
     qwen38_9b_distill_identity = (
         architecture == "qwen35"
         and model_name == QWEN38_9B_DISTILL_VERIFIED_MODEL_NAME
@@ -749,7 +861,17 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             verified_quantization=QWEN38_9B_DISTILL_VERIFIED_QUANTIZATION,
             route_prefix_reuse_supported=False,
         )
+    return None
 
+
+def _match_scope_guard(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    tokenizer_pre = probe.tokenizer_pre
+    model_name = probe.model_name
+    file_type = probe.file_type
+    template_hash = probe.template_hash
+    metadata = probe.metadata
     scope_guard_identity = (
         architecture == "qwen35"
         and model_name == SCOPE_GUARD_VERIFIED_MODEL_NAME
@@ -784,7 +906,17 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             verified_quantization=SCOPE_GUARD_VERIFIED_QUANTIZATION,
             route_prefix_reuse_supported=False,
         )
+    return None
 
+
+def _match_qwen38_flash_next(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    tokenizer_pre = probe.tokenizer_pre
+    model_name = probe.model_name
+    file_type = probe.file_type
+    template_hash = probe.template_hash
+    metadata = probe.metadata
     qwen38_flash_next_identity = (
         architecture == "qwen4exp"
         and model_name == QWEN38_FLASH_NEXT_VERIFIED_MODEL_NAME
@@ -827,7 +959,17 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             # Runtime eligibility additionally pins the qualified configuration.
             route_prefix_reuse_supported=True,
         )
+    return None
 
+
+def _match_lfm25(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    tokenizer_pre = probe.tokenizer_pre
+    model_name = probe.model_name
+    file_type = probe.file_type
+    template_hash = probe.template_hash
+    metadata = probe.metadata
     lfm25_identity = (
         architecture == "lfm2moe"
         and model_name == LFM25_VERIFIED_MODEL_NAME
@@ -866,7 +1008,17 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             gemma_prefix_reuse_supported=False,
             verified_quantization=LFM25_VERIFIED_FILE_TYPES[file_type],
         )
+    return None
 
+
+def _match_qwen3_coder(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    tokenizer_pre = probe.tokenizer_pre
+    model_name = probe.model_name
+    file_type = probe.file_type
+    template_hash = probe.template_hash
+    metadata = probe.metadata
     qwen3_coder_identity = (
         architecture == "qwen3moe"
         and model_name == QWEN3_CODER_VERIFIED_MODEL_NAME
@@ -905,7 +1057,17 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             route_prefix_reuse_supported=True,
             artifact_content_protocol="qwen3-coder-json-string-v1",
         )
+    return None
 
+
+def _match_minicpm5(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    tokenizer_pre = probe.tokenizer_pre
+    model_name = probe.model_name
+    file_type = probe.file_type
+    template_hash = probe.template_hash
+    metadata = probe.metadata
     minicpm5_identity = (
         architecture == "llama"
         and model_name == MINICPM5_VERIFIED_MODEL_NAME
@@ -941,7 +1103,17 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             verified_quantization=MINICPM5_VERIFIED_QUANTIZATION,
             route_prefix_reuse_supported=True,
         )
+    return None
 
+
+def _match_granite42(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    tokenizer_pre = probe.tokenizer_pre
+    model_name = probe.model_name
+    file_type = probe.file_type
+    template_hash = probe.template_hash
+    metadata = probe.metadata
     granite42_identity = (
         architecture == "granite"
         and model_name == GRANITE42_VERIFIED_MODEL_NAME
@@ -976,7 +1148,17 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             verified_quantization=_GRANITE42_QUANTIZATIONS[file_type],
             route_prefix_reuse_supported=True,
         )
+    return None
 
+
+def _match_granite42_8b(probe: _Probe) -> NativeModelProfile | None:
+    architecture = probe.architecture
+    tokenizer_model = probe.tokenizer_model
+    tokenizer_pre = probe.tokenizer_pre
+    model_name = probe.model_name
+    file_type = probe.file_type
+    template_hash = probe.template_hash
+    metadata = probe.metadata
     granite42_8b_identity = (
         architecture == "granite"
         and model_name == GRANITE42_8B_VERIFIED_MODEL_NAME
@@ -1011,6 +1193,43 @@ def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> N
             verified_quantization=_GRANITE42_QUANTIZATIONS[file_type],
             route_prefix_reuse_supported=True,
         )
+    return None
+
+
+# Order is significant: the first matching identity wins.
+_PROFILE_MATCHERS = (
+    _match_gemma4_e4b_heretic,
+    _match_gemma4,
+    _match_qwen36,
+    _match_ornith15,
+    _match_qwen38,
+    _match_qwen38_saluki,
+    _match_qwen38_arete,
+    _match_qwen38_turbo_fc,
+    _match_qwen38_9b_distill,
+    _match_scope_guard,
+    _match_qwen38_flash_next,
+    _match_lfm25,
+    _match_qwen3_coder,
+    _match_minicpm5,
+    _match_granite42,
+    _match_granite42_8b,
+)
+
+
+def detect_native_model_profile(metadata: Mapping[str, str], template: str) -> NativeModelProfile:
+    probe = _build_probe(metadata, template)
+    for matcher in _PROFILE_MATCHERS:
+        profile = matcher(probe)
+        if profile is not None:
+            return profile
+    architecture = probe.architecture
+    model_name = probe.model_name
+    tokenizer_model = probe.tokenizer_model
+    tokenizer_pre = probe.tokenizer_pre
+    file_type = probe.file_type
+    template_hash = probe.template_hash
+    gemma4_e_series = probe.gemma4_e_series
 
     reason = _unverified_reason(
         architecture=architecture,

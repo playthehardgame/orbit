@@ -62,3 +62,32 @@ Open, not changed (no evidence yet that a change is safe or measured):
   unanswerable PLAN request: covered by unit tests and fixtures only.
 - Throughput: live smokes (MiniCPM5 2B, Granite 3B) were compared before and
   after the first merge only; one run each, so timings are indicative.
+
+## Phase 2 (same day): follow-up changes
+
+| Area | Change | Evidence |
+|---|---|---|
+| Calibration | `host_class.py`: platform-class rules (WSL2/VM/container quota, hybrid P/E cores, ISA, server class) feed the heuristic tier and the sweep's candidates; precedence unchanged, unknown hosts keep the legacy rules | `tests/test_host_class.py`; real sweep below |
+| Timeouts | `ORBIT_SOCKET_READ_TIMEOUT` (408) and `ORBIT_MODEL_LOCK_TIMEOUT` (503), both off by default | `tests/test_native_server_hardening.py` |
+| Logging | stdlib `logging` rotating 0600 file, content modes, secret scrubbing, hash chain + `verify` CLI | `tests/test_request_log_framework.py` |
+| Memory | `ORBIT_MEMORY_GUARD=warn\|refuse\|off` (default warn) | `tests/test_memory_guard.py` |
+| Supply chain | size/sha256 pins for 18 registry files (Gemma mmproj left unpinned on purpose), verified after download, CycloneDX SBOM generator | `tests/test_model_download_integrity.py`, `tests/test_sbom.py` |
+| Structure | complexity/nesting ratchet, ADR 0001, `detect_native_model_profile` 626 to 40 lines behind a 2446-case golden | `tests/test_architecture.py`, `tests/test_model_profile_characterization.py` |
+
+Pins not applied: `qwen38-27b-q4-k-m` (registry file name does not exist upstream,
+the repo has `...UD-Q4_K_M.gguf`) and `qwen38-flash-next-ud-iq1-m` (split model,
+path mismatch). Both need a registry fix first.
+
+### Measured calibration sweep (this host, MiniCPM5-2B Q4_K_M, WSL2, Core Ultra 7 155H)
+
+| threads | decode tok/s | prefill tok/s |
+|---|---|---|
+| 5 | 17.6 | 51.8 |
+| 6 | 18.8 | 52.6 |
+| 8 | 15.9 | 64.4 |
+| 11 (old heuristic) | 9.5 | 49.9 |
+| 22 | 0.09 | 9.6 |
+
+The new heuristic picks 5 and the sweep confirmed 5 (6 and 8 within noise). The old
+heuristic would have chosen 11, 46% slower decode. A single model and run: not a
+general benchmark.

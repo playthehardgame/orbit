@@ -320,6 +320,8 @@ removed, reordered or edited rows.
 **Model integrity.** The packaged registry pins the size and SHA-256 of model
 files (from Hugging Face LFS metadata). `orbit download` verifies a fresh
 download against its pin and deletes the file on a mismatch.
+`python3 scripts/generate_sbom.py [out.json]` writes a CycloneDX SBOM
+(Orbit, optional extras, vendored llama.cpp, every pinned model file).
 
 **Platform-aware tuning.** The heuristic thread/batch choice recognises WSL2,
 VMs, containers (cgroup quota and CPU affinity), hybrid CPUs (performance vs.

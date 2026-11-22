@@ -35,6 +35,22 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall -q src/orbit scripts tests
       - name: Source-fresh core tests and recorded-intent replay
-        run: python scripts/check_core.py
+        shell: bash
+        run: |
+          set +e
+          python scripts/check_core.py > core.log 2>&1
+          status=$?
+          cat core.log
+          if [ "$status" -ne 0 ]; then
+            # Surface the failure as a public annotation (job logs need a login).
+            {
+              echo "env: SHELL=${SHELL:-<unset>} HOME=$HOME python=$(python -V 2>&1) cpus=$(nproc)"
+              grep -E '^(FAIL|ERROR):' core.log | head -20
+              grep -E -A12 '^(FAIL|ERROR):' core.log | head -60
+            } > core-summary.txt
+            msg=$(head -c 3500 core-summary.txt | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\r//g;s/\n/%0A/g')
+            echo "::error title=core checks failed::${msg}"
+          fi
+          exit "$status"
       - name: Check changed-line whitespace
         run: git diff --check HEAD^ HEAD

@@ -61,6 +61,7 @@ from typing import Mapping
 
 from orbit.native_llama.bindings import LLAMA_LAZY_MODE_ON, LLAMA_LOAD_MODE_MMAP
 from orbit.native_llama.model_profiles import QWEN38_FLASH_NEXT_PROFILE_ID
+from .host_class import HostClass, detect_host_class, recommend
 
 # The reference numbers. They remain the fallback because they are the only
 # values with a qualified corpus behind them, and a machine we cannot measure
@@ -241,6 +242,11 @@ class HostTopology:
     # qualified-machine matching; deliberately NOT part of profile_fingerprint,
     # so it never changes a cached tuning profile's identity.
     machine_model: str = ""
+    # Platform class (WSL2/VM/container, hybrid cores, ISA, cgroup limits). Like
+    # `machine_model` it is not part of `profile_fingerprint`. `host.known` is
+    # False unless live detection ran, which keeps the legacy heuristic exact for
+    # any hand-built or injected topology.
+    host: HostClass = HostClass()
 
 
 @dataclass(frozen=True)
@@ -280,6 +286,7 @@ def detect_topology(
     meminfo_text: str | None = None,
     cpuinfo_text: str | None = None,
     machine_model_text: str | None = None,
+    classify: bool | None = None,
 ) -> HostTopology:
     """Read the machine. Every failure degrades to a smaller number, never a
     larger one, because every consumer of this treats bigger as more permission.
@@ -334,6 +341,17 @@ def detect_topology(
         except OSError:
             machine_model = ""
 
+    # Live detection only: any injected text means a test or a replay, which
+    # must not pick up the host's sysfs.
+    if classify is None:
+        classify = meminfo_text is None and cpuinfo_text is None and machine_model_text is None
+    host = (
+        detect_host_class(
+            cpu_model=model, physical_cores=max(1, physical), logical_cpus=max(1, logical),
+            cpuinfo_text=cpuinfo,
+        )
+        if classify else HostClass()
+    )
     return HostTopology(
         cpu_model=model,
         physical_cores=max(1, physical),
@@ -342,6 +360,19 @@ def detect_topology(
         available_ram_mib=_meminfo_mib("MemAvailable", meminfo),
         swap_total_mib=_meminfo_mib("SwapTotal", meminfo),
         machine_model=machine_model,
+        host=host,
+    )
+
+
+def _class_recommendation(topology: HostTopology):
+    """The platform-class rule table, or None when the platform is unknown."""
+    if not topology.host.known:
+        return None
+    return recommend(
+        physical_cores=topology.physical_cores, logical_cpus=topology.logical_cpus,
+        total_ram_mib=topology.total_ram_mib, host=topology.host,
+        max_threads=MAX_THREADS, fallback_threads=FALLBACK_THREADS,
+        fallback_batch=FALLBACK_BATCH, fallback_ubatch=FALLBACK_UBATCH,
     )
 
 
@@ -367,6 +398,9 @@ def thread_candidates(topology: HostTopology) -> "list[int]":
     }
     if physical >= FALLBACK_THREADS:
         raw.add(FALLBACK_THREADS)
+    rec = _class_recommendation(topology)
+    if rec is not None:
+        raw.update(rec.candidates)
     bounded = sorted(
         {min(MAX_THREADS, max(MIN_THREADS, value)) for value in raw if value > 0}
     )
@@ -461,6 +495,18 @@ def heuristic_profile(
     Batch and ubatch stay at the qualified pair unless the machine is clearly
     smaller than the reference, because nothing has measured an alternative.
     """
+    rec = _class_recommendation(topology)
+    if rec is not None:
+        return ServerProfile(
+            threads=rec.decode_threads,
+            threads_batch=rec.batch_threads,
+            batch=rec.batch,
+            ubatch=rec.ubatch,
+            cache_ram_mib=compute_cache_ram_mib(
+                topology, model_bytes=model_bytes, ctx_tokens=ctx_tokens
+            ),
+            source="heuristic",
+        )
     physical = max(1, topology.physical_cores)
     logical = max(physical, topology.logical_cpus)
     total_gib = topology.total_ram_mib // 1024

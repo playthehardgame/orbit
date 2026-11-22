@@ -129,5 +129,60 @@ class RequestGateTests(unittest.TestCase):
             server.server_close()
 
 
+class TimeoutTests(unittest.TestCase):
+    def test_env_seconds_parsing(self):
+        self.assertIsNone(app.env_seconds("X", {}))
+        for bad in ("0", "-1", "abc", "nan", "inf", ""):
+            self.assertIsNone(app.env_seconds("X", {"X": bad}), bad)
+        self.assertEqual(app.env_seconds("X", {"X": "2.5"}), 2.5)
+
+    def test_model_lock_times_out_with_server_busy(self):
+        server = app.OrbitNativeServer.__new__(app.OrbitNativeServer)
+        server.lock = threading.Lock()
+        server.lock.acquire()
+        with mock.patch.dict(os.environ, {app.MODEL_LOCK_TIMEOUT_ENV: "0.1"}):
+            with self.assertRaises(app.ServerBusy):
+                with server._model_lock():
+                    self.fail("must not acquire")
+        self.assertEqual(server._waiters, 0)
+        server.lock.release()
+        with mock.patch.dict(os.environ, {app.MODEL_LOCK_TIMEOUT_ENV: "0.1"}):
+            with server._model_lock():
+                pass
+
+    def test_model_lock_without_timeout_blocks_as_before(self):
+        server = app.OrbitNativeServer.__new__(app.OrbitNativeServer)
+        server.lock = threading.Lock()
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(app.MODEL_LOCK_TIMEOUT_ENV, None)
+            with server._model_lock():
+                self.assertTrue(server.lock.locked())
+        self.assertFalse(server.lock.locked())
+
+    def test_slow_body_gets_408_and_health_still_works(self):
+        import http.client
+        import socket
+        from http.server import ThreadingHTTPServer
+        server = ThreadingHTTPServer(("127.0.0.1", 0), app.OrbitNativeHandler)
+        server.request_logger = None
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        port = server.server_address[1]
+        try:
+            with mock.patch.dict(os.environ, {app.SOCKET_READ_TIMEOUT_ENV: "0.3"}):
+                with socket.create_connection(("127.0.0.1", port), timeout=5) as sock:
+                    sock.sendall(b"POST /v1/chat/completions HTTP/1.1\r\nHost: x\r\n"
+                                 b"Content-Length: 50\r\n\r\n{")
+                    data = sock.recv(4096)
+                self.assertIn(b" 408 ", data.split(b"\r\n", 1)[0])
+                conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+                conn.request("GET", "/health")
+                self.assertEqual(conn.getresponse().status, 200)
+                conn.close()
+        finally:
+            server.shutdown()
+            server.server_close()
+
+
 if __name__ == "__main__":
     unittest.main()

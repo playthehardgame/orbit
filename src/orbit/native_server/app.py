@@ -180,8 +180,17 @@ class OrbitNativeServer:
         with guard:
             self._waiters = self.__dict__.get("_waiters", 0) + 1
         try:
-            with self.lock:
+            timeout = env_seconds(MODEL_LOCK_TIMEOUT_ENV)
+            if timeout is None:
+                acquired = self.lock.acquire()
+            else:
+                acquired = self.lock.acquire(timeout=timeout)
+            if not acquired:
+                raise ServerBusy(f"model busy for more than {timeout:g}s")
+            try:
                 yield
+            finally:
+                self.lock.release()
         finally:
             with guard:
                 self._waiters -= 1
@@ -570,6 +579,28 @@ def max_inflight_requests(environ: Mapping[str, str] | None = None) -> int:
     return value if value > 0 else DEFAULT_MAX_INFLIGHT_REQUESTS
 
 
+SOCKET_READ_TIMEOUT_ENV = "ORBIT_SOCKET_READ_TIMEOUT"
+MODEL_LOCK_TIMEOUT_ENV = "ORBIT_MODEL_LOCK_TIMEOUT"
+
+
+def env_seconds(name: str, environ: "Mapping[str, str] | None" = None) -> float | None:
+    """A positive number of seconds from the environment, else None (= unlimited)."""
+    raw = (os.environ if environ is None else environ).get(name, "")
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 and value == value and value != float("inf") else None
+
+
+class ServerBusy(Exception):
+    """The model did not become free within ORBIT_MODEL_LOCK_TIMEOUT."""
+
+
+class RequestTimeout(Exception):
+    """The client sent the request too slowly (ORBIT_SOCKET_READ_TIMEOUT)."""
+
+
 class RequestGate:
     """Non-blocking counter of in-flight requests (limit read lazily from env)."""
 
@@ -608,9 +639,27 @@ class OrbitNativeHandler(BaseHTTPRequestHandler):
             endpoint = "other"
         return telemetry.span("orbit.server.request", **{"orbit.operation": method, "orbit.endpoint": endpoint.strip("/").replace("/", ".") or "root"})
 
+    def setup(self) -> None:
+        # Bound slow or stalled clients while the request is being read; the
+        # timeout is lifted before generation starts (see `_end_read_phase`).
+        timeout = env_seconds(SOCKET_READ_TIMEOUT_ENV)
+        if timeout is not None:
+            self.timeout = timeout
+        super().setup()
+
+    def _end_read_phase(self) -> None:
+        try:
+            self.connection.settimeout(None)
+        except (AttributeError, OSError):
+            pass
+
     def do_GET(self) -> None:
-        with self._telemetry_request("GET"):
-            self._do_get()
+        self._end_read_phase()
+        try:
+            with self._telemetry_request("GET"):
+                self._do_get()
+        except ServerBusy as exc:
+            self._json({"error": str(exc)}, status=503)
 
     def do_POST(self) -> None:
         # Generation is serialized behind one lock; unbounded waiters only hold
@@ -622,6 +671,11 @@ class OrbitNativeHandler(BaseHTTPRequestHandler):
         try:
             with self._telemetry_request("POST"):
                 self._do_post()
+        except ServerBusy as exc:
+            self._json({"error": str(exc)}, status=503)
+        except RequestTimeout as exc:
+            self.close_connection = True
+            self._json({"error": str(exc)}, status=408)
         finally:
             REQUEST_GATE.leave()
 
@@ -890,8 +944,14 @@ class OrbitNativeHandler(BaseHTTPRequestHandler):
     def _read_json(self) -> dict[str, Any]:
         length = parse_content_length(self.headers.get("Content-Length"))
         if length <= 0:
+            self._end_read_phase()
             return {}
-        raw = self.rfile.read(length)
+        try:
+            raw = self.rfile.read(length)
+        except TimeoutError as exc:
+            raise RequestTimeout("request body not received in time") from exc
+        finally:
+            self._end_read_phase()
         try:
             data = json.loads(raw.decode("utf-8"))
         except json.JSONDecodeError as exc:

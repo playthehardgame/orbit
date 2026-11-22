@@ -292,6 +292,43 @@ the temporary directory, owned by the same user) that a crashed or killed
 process left behind and that have not been modified for 7 days. Set
 `ORBIT_ANALYSIS_SWEEP_DAYS` to change the threshold; `0` disables the sweep.
 
+**Timeouts (all off by default).** `ORBIT_SOCKET_READ_TIMEOUT=<seconds>` bounds
+how long a client may take to send its request (headers and body); a stalled
+body gets HTTP 408 and the connection is closed. The limit is lifted before
+generation starts, so streaming responses are never cut by it.
+`ORBIT_MODEL_LOCK_TIMEOUT=<seconds>` bounds how long a request waits for the
+model (generation is serialized); past it the request gets HTTP 503
+(`model busy`). Non-positive or invalid values mean "no timeout".
+
+**Memory guard.** `ORBIT_MEMORY_GUARD=warn` (default) prints an advisory line
+when the model plus KV window will not fit in the RAM free right now. `refuse`
+stops the start with an error instead (`--show-profile` still only reports);
+`off` silences it. The default stays advisory because beyond-RAM models are
+qualified to run mmap'd from disk.
+
+**Log framework.** The request log uses Python's `logging` with a rotating,
+owner-only file: `ORBIT_LOG_MAX_BYTES` (default 64 MiB; rotation is disabled
+with `ORBIT_LOG_BACKUPS=0`) and `ORBIT_LOG_BACKUPS` (default 7).
+`ORBIT_LOG_CONTENT=full|redact|none` controls prompt retention: `full`
+(default) keeps text verbatim, `redact` and `none` replace message/prompt text
+with its length and SHA-256. Credentials (bearer tokens, `hf_`/`sk-`/`gh*_`
+keys, private-key headers) are scrubbed in every mode. Each row carries `seq`
+and a SHA-256 hash chained to the previous row, across rotated files and
+restarts; `python -m orbit.native_server.request_logging verify DIR` reports
+removed, reordered or edited rows.
+
+**Model integrity.** The packaged registry pins the size and SHA-256 of model
+files (from Hugging Face LFS metadata). `orbit download` verifies a fresh
+download against its pin and deletes the file on a mismatch.
+
+**Platform-aware tuning.** The heuristic thread/batch choice recognises WSL2,
+VMs, containers (cgroup quota and CPU affinity), hybrid CPUs (performance vs.
+efficiency cores), ISA features and server-class parts. Decode threads track
+performance cores up to a bandwidth-bound ceiling; prompt processing uses all
+fast cores. It only feeds the heuristic tier and the calibration sweep's
+candidate list; explicit settings, qualified profiles, the cache and
+measurements still take precedence. See `src/orbit/native_server/host_class.py`.
+
 ## Development and tests
 
 For the lightweight, artifact-free [core CI gate](docs/CORE_CI.md), run:

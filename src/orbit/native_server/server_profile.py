@@ -481,6 +481,41 @@ def memory_fit_advisory(
     )
 
 
+ENV_MEMORY_GUARD = "ORBIT_MEMORY_GUARD"
+
+
+class MemoryGuardRefusal(RuntimeError):
+    """ORBIT_MEMORY_GUARD=refuse and the model will not fit the free RAM."""
+
+
+def memory_guard_mode(environ: "Mapping[str, str] | None" = None) -> str:
+    """``warn`` (default: advisory line only), ``refuse`` (block the start) or ``off``."""
+    raw = (os.environ if environ is None else environ).get(ENV_MEMORY_GUARD, "warn")
+    raw = raw.strip().lower()
+    return raw if raw in {"warn", "refuse", "off"} else "warn"
+
+
+def apply_memory_guard(
+    topology: HostTopology, *, model_bytes: int, ctx_tokens: int,
+    environ: "Mapping[str, str] | None" = None,
+) -> "str | None":
+    """The advisory line for ``warn``; nothing for ``off``; raises for ``refuse``.
+
+    The block is opt-in because beyond-RAM models are qualified to run mmap'd
+    from disk: refusing them by default would break supported profiles.
+    """
+    mode = memory_guard_mode(environ)
+    if mode == "off":
+        return None
+    message = memory_fit_advisory(topology, model_bytes=model_bytes, ctx_tokens=ctx_tokens)
+    if message and mode == "refuse":
+        raise MemoryGuardRefusal(
+            message.replace("memory advisory", "refusing to start (ORBIT_MEMORY_GUARD=refuse)", 1)
+            + f" Set {ENV_MEMORY_GUARD}=warn to start anyway."
+        )
+    return message
+
+
 def heuristic_profile(
     topology: HostTopology,
     *,

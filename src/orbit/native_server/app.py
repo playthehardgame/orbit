@@ -38,7 +38,8 @@ from orbit.native_server.server_profile import (
     QualifiedStartupProfile,
     Resolution,
     detect_topology,
-    memory_fit_advisory,
+    apply_memory_guard,
+    MemoryGuardRefusal,
     qualified_startup_profile,
     render_profile_lines,
     resolve_cpu_repack,
@@ -1311,7 +1312,7 @@ def _resolve_ctx(args, qualified: "QualifiedStartupProfile | None") -> "tuple[in
 
 
 def _resolve_startup_profile(
-    args, *, calibrator=None, model_identity=None, qualified=None
+    args, *, calibrator=None, model_identity=None, qualified=None, preview=False
 ) -> Resolution:
     """Walk the precedence chain for this invocation.
 
@@ -1333,7 +1334,13 @@ def _resolve_startup_profile(
         model_identity, model_bytes = model_identity
     ctx_tokens, _ctx_source = _resolve_ctx(args, qualified)
     topology = detect_topology()
-    _note_once(memory_fit_advisory(topology, model_bytes=model_bytes, ctx_tokens=ctx_tokens))
+    # A preview never refuses: it only reports what a real start would do.
+    guard_env = {**os.environ, "ORBIT_MEMORY_GUARD": "warn"} if preview else None
+    try:
+        _note_once(apply_memory_guard(
+            topology, model_bytes=model_bytes, ctx_tokens=ctx_tokens, environ=guard_env))
+    except MemoryGuardRefusal as exc:
+        raise SystemExit(f"error: {exc}") from exc
     return resolve_profile(
         cli={
             "threads": args.threads,
@@ -1424,7 +1431,8 @@ def _show_profile(args) -> int:
         return target
     name, path_display, model_identity, missing = target
     qualified = _qualified_startup_profile(args)
-    preview = _resolve_startup_profile(args, model_identity=model_identity, qualified=qualified)
+    preview = _resolve_startup_profile(
+        args, model_identity=model_identity, qualified=qualified, preview=True)
     ctx_tokens, ctx_source = _resolve_ctx(args, qualified)
     print(f"model: {name}")
     print(f"path: {path_display}")

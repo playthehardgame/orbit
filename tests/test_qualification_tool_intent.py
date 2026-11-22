@@ -61,6 +61,22 @@ class Scripted:
 
 class ToolIntentTests(unittest.TestCase):
     def setUp(self):
+        # The recorded request digests include the OS and shell names baked into
+        # ROUTE_SYSTEM_PROMPT at import time ("linux"/"bash" when recorded); pin
+        # them so the replay does not depend on the host ($SHELL is unset on CI).
+        import sys
+        from orbit.runtime import messages
+        pinned = messages._COMMAND_SYSTEM_TEMPLATE.format(os_name="linux", shell_name="bash")
+        original = messages.ROUTE_SYSTEM_PROMPT
+        env = mock.patch.dict("os.environ", {"SHELL": "/bin/bash"})  # for subprocess runs
+        env.start()
+        self.addCleanup(env.stop)
+        for module in list(sys.modules.values()):
+            if ((getattr(module, "__name__", "") or "").startswith(("orbit.", __name__))) and \
+                    getattr(module, "ROUTE_SYSTEM_PROMPT", None) == original:
+                patcher = mock.patch.object(module, "ROUTE_SYSTEM_PROMPT", pinned)
+                patcher.start()
+                self.addCleanup(patcher.stop)
         self.corpus = gate.load_corpus(CORPUS)
         self.cases = {c["id"]: c for c in self.corpus["cases"]}
         self.tmp = tempfile.TemporaryDirectory()

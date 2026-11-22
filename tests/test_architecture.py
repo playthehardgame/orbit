@@ -58,6 +58,30 @@ FROZEN_LONG_FUNCTIONS = {
     "orbit.native_server.app.run_server": 312,
 }
 
+# Line count alone can be gamed (or hidden by a long flat chain), so a second
+# ratchet freezes cyclomatic complexity and block-nesting depth. A function is
+# "complex" above COMPLEXITY_LIMIT decision points or MAX_NESTING nested blocks;
+# listed ones may not get worse, new ones may not appear, and a function that
+# improves below the limit must be removed from the table.
+COMPLEXITY_LIMIT = 55
+MAX_NESTING = 8
+FROZEN_COMPLEXITY = {
+    # name: (cyclomatic complexity, max nesting depth)
+    "orbit.runtime.tool_loop.run_tool_loop": (490, 12),
+    "orbit.native_llama.model_profiles.detect_native_model_profile": (179, 1),
+    "orbit.runtime.analysis_runtime.AnalysisRuntime._run_autonomous_locked": (137, 6),
+    "orbit.native_llama.model_profiles._unverified_reason": (84, 0),
+    "orbit.qualification.validators._lifecycle_failure": (78, 0),
+    "orbit.native_llama.client.NativeLlamaClient._complete_prompt_standard": (76, 6),
+    "orbit.runtime.analysis_runtime.AnalysisRuntime._report_material": (75, 0),
+    "orbit.runtime.environments.FinalFromToolEnvironment.answer": (72, 4),
+    "orbit.runtime.chat.ChatRuntime.ask_auto": (59, 5),
+    "orbit.runtime.analysis_runtime.AnalysisRuntime.step": (58, 2),
+    "orbit.qualification.validators._document_failure": (58, 0),
+    "orbit.runtime.analysis_ioc_proof.Proof.check": (29, 11),
+    "orbit.runtime.analysis_ioc_proof.scan_destinations": (41, 9),
+}
+
 # ORBIT_* names read in src/ that no README/docs/AGENTS text mentions yet.
 # Document a variable instead of adding it here.
 KNOWN_UNDOCUMENTED_ENV = {
@@ -164,6 +188,43 @@ def _long_functions() -> dict[str, int]:
     return sizes
 
 
+def _complexity_of(node: ast.AST) -> int:
+    total = 1
+    for child in ast.walk(node):
+        if isinstance(child, (ast.If, ast.For, ast.AsyncFor, ast.While, ast.ExceptHandler,
+                              ast.IfExp, ast.comprehension, ast.Assert)):
+            total += 1
+        elif isinstance(child, ast.BoolOp):
+            total += len(child.values) - 1
+    return total
+
+
+def _nesting_of(node: ast.AST, depth: int = 0) -> int:
+    deepest = depth
+    for child in ast.iter_child_nodes(node):
+        step = isinstance(child, (ast.If, ast.For, ast.AsyncFor, ast.While, ast.Try, ast.With, ast.AsyncWith))
+        deepest = max(deepest, _nesting_of(child, depth + step))
+    return deepest
+
+
+def _complex_functions() -> dict[str, tuple[int, int]]:
+    found: dict[str, tuple[int, int]] = {}
+    for name, path in _modules().items():
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+
+        def visit(body: list[ast.stmt], prefix: str) -> None:
+            for node in body:
+                if isinstance(node, ast.ClassDef):
+                    visit(node.body, f"{prefix}{node.name}.")
+                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    cx, nest = _complexity_of(node), _nesting_of(node)
+                    if cx > COMPLEXITY_LIMIT or nest > MAX_NESTING:
+                        found[f"{name}.{prefix}{node.name}"] = (cx, nest)
+
+        visit(tree.body, "")
+    return found
+
+
 def _layer(module: str) -> str:
     parts = module.split(".")
     return parts[1] if len(parts) > 1 else parts[0]
@@ -200,6 +261,17 @@ class ArchitectureRatchetTests(unittest.TestCase):
         self.assertEqual(grown, {}, "a frozen long function grew")
         gone = set(FROZEN_LONG_FUNCTIONS) - set(sizes)
         self.assertEqual(gone, set(), "function shrank below the limit: remove it from FROZEN_LONG_FUNCTIONS")
+
+    def test_complexity_is_frozen(self) -> None:
+        found = _complex_functions()
+        new = set(found) - set(FROZEN_COMPLEXITY)
+        self.assertEqual(new, set(), f"new function above {COMPLEXITY_LIMIT} decision points "
+                                     f"or {MAX_NESTING} nested blocks: split it")
+        worse = {k: (found[k], FROZEN_COMPLEXITY[k]) for k in found
+                 if found[k][0] > FROZEN_COMPLEXITY[k][0] or found[k][1] > FROZEN_COMPLEXITY[k][1]}
+        self.assertEqual(worse, {}, "a frozen complex function got more complex")
+        gone = set(FROZEN_COMPLEXITY) - set(found)
+        self.assertEqual(gone, set(), "improved below the limit: remove it from FROZEN_COMPLEXITY")
 
     def test_new_environment_variables_are_documented(self) -> None:
         used: set[str] = set()

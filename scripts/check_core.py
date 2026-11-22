@@ -32,6 +32,7 @@ MODULES = (
     "tests.test_request_log_framework",
     "tests.test_model_download_integrity",
     "tests.test_sbom",
+    "tests.test_model_profile_characterization",
 )
 
 

@@ -50,7 +50,6 @@ LONG_FUNCTION_LINES = 300
 FROZEN_LONG_FUNCTIONS = {
     "orbit.runtime.tool_loop.run_tool_loop": 1809,
     "orbit.runtime.analysis_runtime.AnalysisRuntime._run_autonomous_locked": 1199,
-    "orbit.native_llama.model_profiles.detect_native_model_profile": 626,
     "orbit.runtime.analysis_runtime.AnalysisRuntime.step": 516,
     "orbit.runtime.chat.ChatRuntime.ask_auto": 402,
     "orbit.native_llama.client.NativeLlamaClient._complete_prompt_standard": 367,
@@ -68,7 +67,6 @@ MAX_NESTING = 8
 FROZEN_COMPLEXITY = {
     # name: (cyclomatic complexity, max nesting depth)
     "orbit.runtime.tool_loop.run_tool_loop": (490, 12),
-    "orbit.native_llama.model_profiles.detect_native_model_profile": (179, 1),
     "orbit.runtime.analysis_runtime.AnalysisRuntime._run_autonomous_locked": (137, 6),
     "orbit.native_llama.model_profiles._unverified_reason": (84, 3),
     "orbit.qualification.validators._lifecycle_failure": (78, 8),

@@ -277,6 +277,20 @@
         "size": 991552000,
         "sha256": "ffa64aebf7144bbadd5a1e143b77794d88e76a81cc0168d91de0770eb49e88e0"
       }
+    },
+    {
+      "id": "inkling2-mini-iq4-nl",
+      "display_name": "Inkling 2 Mini",
+      "profile_id": "orbit-inkling2-mini-native-v1",
+      "backend": "native-llama",
+      "architecture": "inkling2_loop",
+      "target": {
+        "repo": "ggml-org/Inkling-2-Mini-GGUF",
+        "file": "Inkling-2-Mini-IQ4_NL.gguf",
+        "cache_glob": "models--ggml-org--Inkling-2-Mini-GGUF/snapshots/*/Inkling-2-Mini-IQ4_NL.gguf",
+        "size": 17627940768,
+        "sha256": "cbdf3fa9dc50a4124977980f37da4f1fa764b0cfe800d275cd43d26ce2a81af4"
+      }
     }
   ]
 }

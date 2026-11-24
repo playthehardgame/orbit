@@ -12,6 +12,7 @@ from pathlib import Path
 from orbit.native_llama.gguf_split import read_gguf_header
 from orbit.native_llama.model_profiles import (
     GEMMA4_E4B_HERETIC_PROFILE_ID,
+    INKLING2_MINI_PROFILE_ID,
     detect_native_model_profile,
 )
 
@@ -28,6 +29,16 @@ class RealGgufTests(unittest.TestCase):
         profile = detect_native_model_profile(metadata, header.kv["tokenizer.chat_template"])
         self.assertTrue(profile.verified, profile.failure_reason)
         self.assertEqual(profile.profile_id, GEMMA4_E4B_HERETIC_PROFILE_ID)
+
+    def test_real_inkling_gguf_matches_pinned_identity(self) -> None:
+        matches = glob.glob("/mnt/l/models/ggml-org--Inkling-2-Mini-GGUF/Inkling-2-Mini-IQ4_NL.gguf")
+        if not matches:
+            self.skipTest("Inkling 2 Mini IQ4_NL GGUF not present on this host")
+        header = read_gguf_header(Path(matches[0]))
+        metadata = {k: str(v) for k, v in header.kv.items() if not isinstance(v, list)}
+        profile = detect_native_model_profile(metadata, header.kv["tokenizer.chat_template"])
+        self.assertTrue(profile.verified, profile.failure_reason)
+        self.assertEqual(profile.profile_id, INKLING2_MINI_PROFILE_ID)
 
 
 if __name__ == "__main__":

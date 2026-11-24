@@ -19,6 +19,20 @@ GEMMA4_E4B_HERETIC_VERIFIED_MODEL_NAME = "Gemma 4 E4B It Ultra Uncensored Hereti
 GEMMA4_E4B_HERETIC_TEMPLATE_SHA256 = "781d10940fbc44be40064b5d43a056fc486c84ceaa55538226368b57314132bf"
 GEMMA4_E4B_HERETIC_VERIFIED_FILE_TYPE = "15"
 GEMMA4_E4B_HERETIC_VERIFIED_QUANTIZATION = "Q4_K_M"
+# Thinking Machines Inkling 2 Mini (ggml-org GGUF): `inkling2_loop`, a looped MoE
+# (24 blocks, 128 experts / 8 used, blocks 6-17 run 3x per token). Exactly one
+# artifact is identity-pinned: the official ggml-org IQ4_NL (general.file_type
+# 25), read from the real GGUF header. The embedded template renders tools as a
+# JSON `tool_declare` block and reasoning as `<|content_thinking|>` blocks, and
+# takes `reasoning_effort` (default 0.9) rather than `enable_thinking`, so the
+# model always reasons from Orbit's point of view. llama.cpp parses it with its
+# dedicated Inkling PEG parser. Image input (mmproj) is not wired: no multimodal.
+INKLING2_MINI_PROFILE_ID = "orbit-inkling2-mini-native-v1"
+INKLING2_MINI_VERIFIED_MODEL_NAME = "Inkling 2 Mini"
+INKLING2_MINI_ARCHITECTURE = "inkling2_loop"
+INKLING2_MINI_OFFICIAL_TEMPLATE_SHA256 = "53a9035f3255945704b5857657cfb00c1165090c0641c4f782a0cbf268cc16dc"
+INKLING2_MINI_VERIFIED_FILE_TYPE = "25"
+INKLING2_MINI_VERIFIED_QUANTIZATION = "IQ4_NL"
 QWEN36_PROFILE_ID = "orbit-qwen36-native-v1"
 QWEN36_VERIFIED_MODEL_NAME = "Qwen3.6-35B-A3B"
 QWEN36_OFFICIAL_TEMPLATE_SHA256 = "e84f32a23fdda27689f868aa4a1a5621f41133e51a48d7f3efcbea2839574259"
@@ -139,6 +153,10 @@ PROFILE_METADATA_KEYS = frozenset(
         "lfm2moe.block_count",
         "lfm2moe.expert_count",
         "lfm2moe.expert_used_count",
+        "inkling2_loop.block_count",
+        "inkling2_loop.expert_count",
+        "inkling2_loop.expert_used_count",
+        "inkling2_loop.loop.count",
         "llama.context_length",
         "llama.block_count",
         "granite.context_length",
@@ -373,6 +391,9 @@ VERIFIED_NATIVE_MODEL_IDENTITIES = (
         QWEN38_FLASH_NEXT_PROFILE_ID, QWEN38_FLASH_NEXT_VERIFIED_MODEL_NAME, "qwen4exp"
     ),
     VerifiedNativeModelIdentity(LFM25_PROFILE_ID, LFM25_VERIFIED_MODEL_NAME, "lfm2moe"),
+    VerifiedNativeModelIdentity(
+        INKLING2_MINI_PROFILE_ID, INKLING2_MINI_VERIFIED_MODEL_NAME, INKLING2_MINI_ARCHITECTURE
+    ),
     VerifiedNativeModelIdentity(LFM25_Q8_PROFILE_ID, LFM25_VERIFIED_MODEL_NAME, "lfm2moe"),
     VerifiedNativeModelIdentity(LFM25_Q6_PROFILE_ID, LFM25_VERIFIED_MODEL_NAME, "lfm2moe"),
     VerifiedNativeModelIdentity(
@@ -962,6 +983,47 @@ def _match_qwen38_flash_next(probe: _Probe) -> NativeModelProfile | None:
     return None
 
 
+def _match_inkling2_mini(probe: _Probe) -> NativeModelProfile | None:
+    metadata = probe.metadata
+    identity = (
+        probe.architecture == INKLING2_MINI_ARCHITECTURE
+        and probe.model_name == INKLING2_MINI_VERIFIED_MODEL_NAME
+        and probe.tokenizer_model == "gpt2"
+        and probe.tokenizer_pre == "inkling2"
+        and probe.file_type == INKLING2_MINI_VERIFIED_FILE_TYPE
+        and metadata.get("tokenizer.ggml.eos_token_id", "").strip() == "200006"
+        and metadata.get("tokenizer.ggml.padding_token_id", "").strip() == "199999"
+        and metadata.get("inkling2_loop.block_count", "").strip() == "24"
+        and metadata.get("inkling2_loop.expert_count", "").strip() == "128"
+        and metadata.get("inkling2_loop.expert_used_count", "").strip() == "8"
+        and metadata.get("inkling2_loop.loop.count", "").strip() == "3"
+        and probe.template_hash == INKLING2_MINI_OFFICIAL_TEMPLATE_SHA256
+    )
+    if not identity:
+        return None
+    return NativeModelProfile(
+        profile_id=INKLING2_MINI_PROFILE_ID,
+        family="inkling2",
+        model_name=probe.model_name,
+        architecture=probe.architecture,
+        renderer="llama.cpp-jinja",
+        reasoning_protocol="inkling-content-thinking",
+        tool_call_protocol="inkling-json",
+        history_serialization="orbit-native-roles",
+        verified=True,
+        failure_reason=None,
+        template_source="gguf-embedded-official",
+        template_sha256=probe.template_hash,
+        supported_capabilities=TEXT_CAPABILITIES,
+        thinking_supported=True,
+        reasoning_behavior=ReasoningBehavior.ALWAYS,
+        separated_reasoning=True,
+        mtp_supported=False,
+        gemma_prefix_reuse_supported=False,
+        verified_quantization=INKLING2_MINI_VERIFIED_QUANTIZATION,
+    )
+
+
 def _match_lfm25(probe: _Probe) -> NativeModelProfile | None:
     architecture = probe.architecture
     tokenizer_model = probe.tokenizer_model
@@ -1210,6 +1272,7 @@ _PROFILE_MATCHERS = (
     _match_scope_guard,
     _match_qwen38_flash_next,
     _match_lfm25,
+    _match_inkling2_mini,
     _match_qwen3_coder,
     _match_minicpm5,
     _match_granite42,

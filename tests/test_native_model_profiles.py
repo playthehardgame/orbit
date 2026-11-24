@@ -197,6 +197,66 @@ LFM25_METADATA = {
 }
 
 
+INKLING2_MINI_METADATA = {
+    "general.architecture": "inkling2_loop",
+    "general.name": "Inkling 2 Mini",
+    "general.file_type": "25",
+    "tokenizer.ggml.model": "gpt2",
+    "tokenizer.ggml.pre": "inkling2",
+    "tokenizer.ggml.eos_token_id": "200006",
+    "tokenizer.ggml.padding_token_id": "199999",
+    "inkling2_loop.block_count": "24",
+    "inkling2_loop.expert_count": "128",
+    "inkling2_loop.expert_used_count": "8",
+    "inkling2_loop.loop.count": "3",
+}
+
+
+class Inkling2MiniProfileTests(unittest.TestCase):
+    """Only the official ggml-org IQ4_NL artifact is identity-verified."""
+
+    def _detect(self, metadata=None, template="official-inkling-template"):
+        digest = hashlib.sha256(template.encode()).hexdigest()
+        with mock.patch(
+            "orbit.native_llama.model_profiles.INKLING2_MINI_OFFICIAL_TEMPLATE_SHA256", digest
+        ):
+            return detect_native_model_profile(metadata or INKLING2_MINI_METADATA, template)
+
+    def test_exact_identity_is_verified_with_isolated_capabilities(self):
+        profile = self._detect()
+        self.assertTrue(profile.verified)
+        self.assertEqual(profile.profile_id, "orbit-inkling2-mini-native-v1")
+        self.assertEqual(profile.architecture, "inkling2_loop")
+        self.assertEqual(profile.verified_quantization, "IQ4_NL")
+        self.assertTrue(profile.uses_native_chat_bridge)
+        self.assertTrue(profile.separated_reasoning)
+        self.assertEqual(profile.effective_reasoning_behavior.value, "always")
+        for flag in (profile.mtp_supported, profile.route_prefix_reuse_supported,
+                     profile.multimodal_supported, profile.gemma_prefix_reuse_supported):
+            self.assertFalse(flag)
+
+    def test_any_identity_drift_is_unsupported(self):
+        for key, value in (
+            ("general.file_type", "7"),
+            ("general.name", "Inkling 2 Small"),
+            ("inkling2_loop.expert_count", "64"),
+            ("inkling2_loop.loop.count", "2"),
+            ("tokenizer.ggml.pre", "gpt2"),
+        ):
+            with self.subTest(key=key):
+                profile = self._detect({**INKLING2_MINI_METADATA, key: value})
+                self.assertFalse(profile.verified)
+                self.assertEqual(profile.profile_id, "unsupported")
+
+    def test_other_template_is_unsupported(self):
+        digest = hashlib.sha256(b"official-inkling-template").hexdigest()
+        with mock.patch(
+            "orbit.native_llama.model_profiles.INKLING2_MINI_OFFICIAL_TEMPLATE_SHA256", digest
+        ):
+            profile = detect_native_model_profile(INKLING2_MINI_METADATA, "edited template")
+        self.assertFalse(profile.verified)
+
+
 class Qwen38ProfileTests(unittest.TestCase):
     """Qwen3.8 is a distinct dense `qwen35` identity, isolated from Qwen3.6."""
 

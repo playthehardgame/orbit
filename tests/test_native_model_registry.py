@@ -77,6 +77,7 @@ class NativeModelRegistryTests(unittest.TestCase):
                 ("NousResearch Arete 27B", "orbit-qwen38-arete-native-v1"),
                 ("Qwen3.8 27B TurboFCFusion Heretic NEO-CODER", "orbit-qwen38-turbo-fcfusion-native-v1"),
                 ("Gemma 4 E4B Heretic", "orbit-gemma4-e4b-heretic-native-v1"),
+                ("Inkling 2 Mini", "orbit-inkling2-mini-native-v1"),
             ],
         )
         self.assertEqual(
@@ -171,6 +172,11 @@ class NativeModelRegistryTests(unittest.TestCase):
                     "orbit-gemma4-e4b-heretic-native-v1",
                     "llmfan46/gemma-4-E4B-it-ultra-uncensored-heretic-GGUF",
                     "gemma-4-E4B-it-ultra-uncensored-heretic-Q4_K_M.gguf",
+                ),
+                (
+                    "orbit-inkling2-mini-native-v1",
+                    "ggml-org/Inkling-2-Mini-GGUF",
+                    "Inkling-2-Mini-IQ4_NL.gguf",
                 ),
             ],
         )

@@ -29,12 +29,35 @@ struct orbit_chat_context {
     common_chat_templates_ptr templates;
     common_chat_format format = COMMON_CHAT_FORMAT_CONTENT_ONLY;
     std::string generation_prompt;
-    std::string parser;
+    common_peg_arena parser;   // arena since the Nov-2026 upstream parser refactor (was serialized text)
+    std::string parser_text;   // textual dump, only for the MiniCPM5 envelope sniffing below
     std::string reasoning_start_tag;
     std::string reasoning_end_tag;
+    const llama_vocab * vocab = nullptr;  // model-owned; lets the parser see special-token ids
     bool minicpm5_plain_text_fallback = false;
     bool render_ready = false;
 };
+
+// Token-aware parsers (Inkling) match control markers by token id, not by text.
+// Re-tokenize with special tokens parsed and keep one id per piece start. If the
+// pieces do not reproduce the text byte for byte (e.g. a partial UTF-8 tail),
+// fall back to text-only input, which every text-matching parser still accepts.
+common_chat_input chat_input_from_text(const llama_vocab * vocab, const std::string & text) {
+    common_chat_input plain(text);
+    if (vocab == nullptr || text.empty()) {
+        return plain;
+    }
+    try {
+        const auto ids = common_tokenize(vocab, text, /*add_special=*/false, /*parse_special=*/true);
+        common_chat_input tokenized;
+        for (const llama_token id : ids) {
+            tokenized.append(common_token_to_piece(vocab, id, /*special=*/true), id);
+        }
+        return tokenized.text == text ? tokenized : plain;
+    } catch (const std::exception &) {
+        return plain;
+    }
+}
 
 int copy_result(const std::string & value, char * output, size_t output_size) {
     if (output == nullptr || output_size == 0) {
@@ -88,6 +111,7 @@ ORBIT_EXPORT void * orbit_chat_bridge_create(const llama_model * model) {
     try {
         auto context = std::make_unique<orbit_chat_context>();
         context->templates = common_chat_templates_init(model, "");
+        context->vocab = llama_model_get_vocab(model);
         if (!context->templates) {
             last_error = "failed to initialize chat templates";
             return nullptr;
@@ -139,7 +163,8 @@ static int render_contract(
         inputs.chat_template_kwargs["enable_thinking"] = enable_thinking ? "true" : "false";
 
         const common_chat_params params = common_chat_templates_apply(context->templates.get(), inputs);
-        if (params.prompt.empty()) {
+        const std::string rendered_prompt = params.prompt.str();
+        if (rendered_prompt.empty()) {
             throw std::runtime_error("chat template produced an empty prompt");
         }
         if (required && (inputs.tools.empty() || params.grammar.empty() || params.grammar_lazy)) {
@@ -148,6 +173,7 @@ static int render_contract(
         context->format = params.format;
         context->generation_prompt = params.generation_prompt;
         context->parser = params.parser;
+        context->parser_text = params.parser.empty() ? std::string() : params.parser.dump(params.parser.root());
         context->reasoning_start_tag = params.thinking_start_tag;
         context->reasoning_end_tag = params.thinking_end_tags.empty() ? std::string() : params.thinking_end_tags.front();
         // MiniCPM5's embedded PEG parser is currently unusable in the
@@ -155,12 +181,12 @@ static int render_contract(
         // std::bad_alloc.  Keep the renderer and raw generation available,
         // but only fall back for plain text; tool envelopes remain fail-closed.
         context->minicpm5_plain_text_fallback =
-            context->parser.find("<function name=\"") != std::string::npos &&
-            context->parser.find("<param name=\"") != std::string::npos;
+            context->parser_text.find("<function name=\"") != std::string::npos &&
+            context->parser_text.find("<param name=\"") != std::string::npos;
         context->render_ready = true;
 
         json result = {
-            {"prompt", params.prompt},
+            {"prompt", rendered_prompt},
             {"generation_prompt", params.generation_prompt},
             {"format", common_chat_format_name(params.format)},
             {"supports_thinking", params.supports_thinking},
@@ -258,18 +284,15 @@ ORBIT_EXPORT int orbit_chat_bridge_parse(
     try {
         common_chat_parser_params params;
         params.format = context->format;
-        params.reasoning_format = COMMON_REASONING_FORMAT_DEEPSEEK;
-        params.reasoning_in_content = false;
-        params.generation_prompt = context->generation_prompt;
+        params.generation_prompt = chat_input_from_text(context->vocab, context->generation_prompt);
         params.reasoning_start_tag = context->reasoning_start_tag;
         params.reasoning_end_tag = context->reasoning_end_tag;
-        params.parse_tool_calls = true;
         if (!context->parser.empty()) {
-            params.parser.load(context->parser);
+            params.parser = context->parser;
         }
         common_chat_msg message;
         try {
-            message = common_chat_parse(generated_text, is_partial, params);
+            message = common_chat_parse(chat_input_from_text(context->vocab, generated_text), is_partial, params);
         } catch (const std::exception &) {
             if (!context->minicpm5_plain_text_fallback ||
                 std::strstr(generated_text, "<function") != nullptr ||
@@ -281,9 +304,7 @@ ORBIT_EXPORT int orbit_chat_bridge_parse(
             // tool envelope as assistant prose.
             common_chat_parser_params plain;
             plain.format = COMMON_CHAT_FORMAT_CONTENT_ONLY;
-            plain.reasoning_format = COMMON_REASONING_FORMAT_NONE;
-            plain.reasoning_in_content = false;
-            message = common_chat_parse(generated_text, is_partial, plain);
+            message = common_chat_parse(common_chat_input(std::string(generated_text)), is_partial, plain);
         }
         return copy_result(parsed_message_json(message).dump(), output, output_size);
     } catch (const std::exception & exc) {

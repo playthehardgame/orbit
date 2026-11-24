@@ -1,4 +1,5 @@
 #include "llama.h"
+#include "orbit_batch_compat.h"
 #include "common/common.h"
 #include "common/speculative.h"
 #include "common/sampling.h"
@@ -281,7 +282,7 @@ static bool run_orbit_current(
 
                 llama_batch prefill_spec = llama_batch_init((int32_t) prompt_tgt.size(), 0, 1);
                 fill_batch(prefill_spec, prompt_tgt, 0);
-                if (!common_speculative_process(spec, prefill_spec)) {
+                if (!common_speculative_process(spec, orbit_common_batch(ctx_tgt, prefill_spec))) {
                     llama_batch_free(prefill_spec);
                     summary.error = "speculative prefill failed";
                     common_sampler_free(smpl);
@@ -361,7 +362,7 @@ static bool run_orbit_current(
             return false;
         }
         summary.target_decode_calls++;
-        if (!common_speculative_process(spec, validate)) {
+        if (!common_speculative_process(spec, orbit_common_batch(ctx_tgt, validate))) {
             llama_batch_free(validate);
             summary.error = "speculative validate process failed";
             common_sampler_free(smpl);
@@ -496,7 +497,7 @@ static bool run_server_context_like(
         return false;
     }
     summary.target_decode_calls++;
-    if (!common_speculative_process(spec, prompt_batch)) {
+    if (!common_speculative_process(spec, orbit_common_batch(ctx_tgt, prompt_batch))) {
         llama_batch_free(prompt_batch);
         summary.error = "speculative prompt process failed";
         common_sampler_free(smpl);
@@ -572,7 +573,7 @@ static bool run_server_context_like(
             return false;
         }
         summary.target_decode_calls++;
-        if (!common_speculative_process(spec, validate)) {
+        if (!common_speculative_process(spec, orbit_common_batch(ctx_tgt, validate))) {
             llama_batch_free(validate);
             summary.error = "speculative validate process failed";
             common_sampler_free(smpl);

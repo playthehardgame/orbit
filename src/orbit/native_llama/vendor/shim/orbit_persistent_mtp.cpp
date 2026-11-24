@@ -1,4 +1,5 @@
 #include "llama.h"
+#include "orbit_batch_compat.h"
 // `llama_get_ctx_other` reports whether a draft context physically shares its
 // memory with the target. It lives in the internal extension header rather than
 // the public one; build_support already puts <llama_root>/src on the include
@@ -1394,7 +1395,7 @@ static orbit_step_outcome resolve_validate_accept_restore(
         // from the event stream. Emitted before the timing bracket opens.
         trace_draft_process("validate", validate_pos0, validate_tokens.size());
         const auto phase_start = std::chrono::steady_clock::now();
-        const bool ok = common_speculative_process(spec, validate);
+        const bool ok = common_speculative_process(spec, orbit_common_batch(ctx_tgt, validate));
         phase_add(session->phase_speculative_process, phase_start);
         if (!ok) {
             llama_batch_free(validate);
@@ -2881,7 +2882,7 @@ extern "C" bool orbit_mtp_session_complete(
                             "prefill", draft_pos0 + (int32_t) offset, chunk.size());
                         {
                             const auto phase_start = std::chrono::steady_clock::now();
-                            const bool ok = common_speculative_process(session->spec, prefill);
+                            const bool ok = common_speculative_process(session->spec, orbit_common_batch(session->ctx_tgt_borrowed, prefill));
                             phase_add(session->phase_speculative_process, phase_start);
                             if (!ok) {
                                 llama_batch_free(prefill);

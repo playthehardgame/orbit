@@ -1,4 +1,5 @@
 #include "llama.h"
+#include "orbit_batch_compat.h"
 #include "common/speculative.h"
 
 #include <algorithm>
@@ -207,7 +208,7 @@ int main(int argc, char ** argv) {
             error = "failed to decode target prompt";
             goto cleanup;
         }
-        if (!common_speculative_process(spec, prompt_batch)) {
+        if (!common_speculative_process(spec, orbit_common_batch(ctx_tgt, prompt_batch))) {
             error = "failed to process speculative prompt batch";
             goto cleanup;
         }

@@ -1,4 +1,5 @@
 #include "llama.h"
+#include "orbit_batch_compat.h"
 #include "common/speculative.h"
 
 #include <algorithm>
@@ -164,7 +165,7 @@ static bool run_prompt(
             out.target_decode_calls++;
             rss_peak = std::max(rss_peak, rss_kb());
 
-            if (!common_speculative_process(spec, prefill)) {
+            if (!common_speculative_process(spec, orbit_common_batch(ctx_tgt, prefill))) {
                 out.error = "failed to process speculative prefill";
                 llama_batch_free(prefill);
                 llama_sampler_free(smpl);

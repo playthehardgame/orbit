@@ -261,7 +261,9 @@ bool abi_supported() {
     return std::strcmp(abi_profile(), "unsupported") != 0 &&
         std::strcmp(input_text_profile(), "unsupported") != 0 &&
         std::strcmp(bitmap_result_profile(), "unsupported") != 0 &&
-        sizeof(mtmd_caps) == 2 &&
+        // 46f4da2 appended `gen_audio` (size 3); the two leading flags Orbit reads
+        // keep their offsets, and the bridge never touches the new member.
+        (sizeof(mtmd_caps) == 2 || sizeof(mtmd_caps) == 3) &&
         alignof(mtmd_caps) == 1 &&
         offsetof(mtmd_caps, inp_vision) == 0 &&
         offsetof(mtmd_caps, inp_audio) == 1;
@@ -322,7 +324,7 @@ ORBIT_EXPORT const char * orbit_mtmd_bridge_manifest_json() {
         "\"vocab_only\":%zu,\"no_alloc\":%zu},"
         "\"llama_context_params\":{\"size\":%zu,\"align\":%zu,"
         "\"n_ctx\":%zu,\"n_outputs_max\":%zu,\"n_threads\":%zu,"
-        "\"flash_attn_type\":%zu,\"defrag_thold\":%zu,\"cb_eval\":%zu,"
+        "\"flash_attn_type\":%zu,\"moe_cache_size\":%zu,\"cb_eval\":%zu,"
         "\"type_k\":%zu,\"abort_callback\":%zu,\"embeddings\":%zu,"
         "\"samplers\":%zu,\"ctx_other\":%zu},"
         "\"llama_sampler_chain_params\":{\"size\":%zu,\"align\":%zu,"
@@ -364,7 +366,7 @@ ORBIT_EXPORT const char * orbit_mtmd_bridge_manifest_json() {
         offsetof(llama_context_params, n_outputs_max),
         offsetof(llama_context_params, n_threads),
         offsetof(llama_context_params, flash_attn_type),
-        offsetof(llama_context_params, defrag_thold),
+        offsetof(llama_context_params, moe_cache_size),
         offsetof(llama_context_params, cb_eval),
         offsetof(llama_context_params, type_k),
         offsetof(llama_context_params, abort_callback),

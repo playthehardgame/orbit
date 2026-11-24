@@ -1515,16 +1515,26 @@ active roadmap and qualification limits.
     calls and finish reasons byte-identical old vs new. Throughput (n=2-3, wall
     clock monotonic, includes prefill for decode): Gemma prefill 20.2 -> 16.3 tok/s,
     decode ~8.3 -> 9.0; Qwen9b prefill 12.8 -> 15.0, decode 4.9 -> 5.1. The
-    Gemma prefill drop (-19%) is real in these runs and NOT explained; it needs a
-    repeat on an idle machine before the merge. An earlier A/B run used the wall clock
-    and was discarded (WSL clock steps produced negative durations).
+    Gemma prefill drop (-19%) did NOT reproduce on an idle repeat (old 14.1/9.1,
+    new 16.4/14.9 tok/s): the old backend alone varied 14.1 -> 9.1 within one session,
+    so host (WSL) variance exceeds the difference and no speed regression is shown
+    (nor a speed-up; an alternating old/new/old/new repeat was not run). An earlier
+    A/B run used the wall clock and was discarded (negative durations from WSL).
   - **Regression found and fixed by that A/B:** a final parse in lenient mode
     returns NEED_MORE_INPUT for plain content, so Orbit's strict success check
     rejected every non-tool Qwen answer (HTTP 500 "does not match the expected
     peg-native format"). Final parses now use `COMPLETE` without `LENIENT`
     (`common/chat.cpp`), as the original Orbit patch did.
-  - **Not verified:** Qwen 3.6/3.8 27B, LFM, Granite, MiniCPM, Ornith were not run
-    on the new backend; MTP on Gemma was not measured (it ran as configured by
+  - **Equivalence on more models (same 4 greedy cases, old vs new):** MiniCPM5 2B,
+    Granite 4.2 3B, Granite 4.2 8B and Underdog Saluki 27B (IQ2) are byte-identical.
+    LFM2.5 8B-A1B: finish reasons and tool calls are identical but the greedy
+    *reasoning* text diverges after ~100 chars in 3 of 4 cases (probably numeric
+    differences from upstream changes to the LFM2 graph; not proven), and the
+    `tool_result` case returns HTTP 500 ("unparsed peg-native output:", empty model
+    output) on BOTH backends, i.e. pre-existing, not caused by the re-pin.
+  - **Not verified:** `qwen38-27b-q4-k-m` is not downloaded on the Dell (no run);
+    Nous Arete 27B (17 GB), Qwen 3.6 35B, Ornith and Qwen3-Coder were not run on the
+    new backend; MTP on Gemma was not measured (it ran as configured by
     default in the A/B but its acceptance rate was not compared); the
     `analysis_*`/`workflow_mode`/`evidence_authority` failures (128 tests)
     reproduce identically on unchanged `main` in this environment.

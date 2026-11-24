@@ -20,14 +20,13 @@ int main() {
             inputs.enable_thinking = request.value("thinking", false);
             inputs.chat_template_kwargs["enable_thinking"] = inputs.enable_thinking ? "true" : "false";
             auto rendered = common_chat_templates_apply(tmpl.get(), inputs);
-            output["prompt"] = rendered.prompt;
+            output["prompt"] = rendered.prompt.str();
             output["grammar"] = rendered.grammar;
-            output["parser"] = rendered.parser;
+            output["parser"] = rendered.parser.empty() ? std::string() : rendered.parser.dump(rendered.parser.root());
             output["format"] = common_chat_format_name(rendered.format);
             common_chat_parser_params params(rendered);
-            params.reasoning_format = COMMON_REASONING_FORMAT_DEEPSEEK;
-            params.parser.load(rendered.parser);
-            auto message = common_chat_parse(request.at("text"), request.value("partial", false), params);
+            params.parser = rendered.parser;
+            auto message = common_chat_parse(common_chat_input(request.at("text").get<std::string>()), request.value("partial", false), params);
             output["content"] = message.content;
             output["reasoning"] = message.reasoning_content;
             output["calls"] = common_json::array();

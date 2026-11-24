@@ -1470,6 +1470,65 @@ active roadmap and qualification limits.
     sidecars match the new provenance; the b9551 binaries are not compatible with
     the new manifest and the bridge refuses them.
 
+- **LLAMA-BACKEND-46F4DA2-INKLING-20 (2026-11-24) — vendored llama.cpp re-pinned
+  from `41abbfd` to `46f4da217419ecac95708600e0f6ebc4bdb91cfd` (build 12657,
+  1689 upstream commits) to load the `inkling2_loop` architecture, and the
+  Inkling 2 Mini profile added. Branch `vendor/llama-inkling`; NOT qualified
+  against the previously qualified models (see "Not verified").**
+  - **Why:** the 41abbfd tree has no `inkling2` support (upstream added it on
+    2026-11-20, PR 32694). It was concluded from the source, not by trying the old
+    backend with the real GGUF.
+  - **Carried Orbit patches** (3-way merge: normalised upstream@41abbfd ->
+    vendored -> normalised upstream@46f4da2; 13 real patch files, 76 declared
+    patched paths incl. whitespace-only): scheduler/CPU/decode profiling
+    (`GGML_SCHED_PROFILE_LOG`), expert-usage telemetry, MTP carryover diagnostics,
+    strict final tool-protocol validation in `common/chat.cpp`. Adapted, not
+    verbatim: upstream now has `COMMON_PEG_PARSE_FLAG_COMPLETE`; the parser params
+    no longer carry `reasoning_format`, so the reasoning-delimiter check is gated on
+    the delimiters the bridge sets and tolerates whitespace around the end tag
+    (some templates spell it `"\n</think>"`). The scheduler input-copy
+    `sync_wait_ms` accounting was dropped (upstream moved that code to
+    `ggml_backend_sched_copy_input`); the decode-profile accumulators remain.
+  - **ABI:** `llama_context_params` lost `defrag_thold` and gained `moe_cache_size`
+    (size_t) + `moe_cache_cpu_share` (float) after `type_v` (`bindings.py`, bridge
+    manifest key renamed). `mtmd_caps` gained `gen_audio` (size 3, bridge accepts
+    2 or 3). `common_batch` replaced `llama_batch` in `common_speculative_process`
+    (`shim/orbit_batch_compat.h` adapts the MTP helpers). The chat bridge now keeps
+    the parser as a `common_peg_arena` and re-tokenizes prompt/output with special
+    tokens, because Inkling's PEG parser matches control markers by token id.
+  - **Inkling 2 Mini (`orbit-inkling2-mini-native-v1`):** ggml-org IQ4_NL only
+    (`general.file_type` 25, template sha256 `53a9035f...`), architecture
+    `inkling2_loop`, native chat bridge, reasoning always on and separated, tool
+    protocol JSON, MTP / route-prefix / multimodal off (mmproj not wired). Registry
+    size+sha256 pinned from HF LFS metadata and verified after download.
+    **Live check on the Dell (CPU, ~16 GiB free of 31):** loads; one chat answer is
+    coherent with separated reasoning (129 tokens in ~28 s, includes prefill); one
+    tool call (`get_time {"city":"Roma"}`) parsed correctly. No throughput
+    benchmark, no qualification fixtures, no long-context or ANALYSIS run.
+  - **A/B against the old backend (same machine, same flags: ctx 8192, 5/5
+    threads, batch 256/128; old = `main` worktree built at 41abbfd):**
+    core-v1 on Gemma 4 26B-A4B: simple_chat/pwd_route/pwd_final PASS and
+    json_artifact FAIL (`artifact_json_mismatch`) on BOTH backends. Qwen3.8 9B
+    Distill: core-v1 fixtures are `NOT_APPLICABLE` for that profile (identity,
+    lifecycle, protocol PASS on both). Greedy equivalence (4 cases: plain chat, two
+    tool calls, answer after a tool result) on Gemma and Qwen9b: generated text, tool
+    calls and finish reasons byte-identical old vs new. Throughput (n=2-3, wall
+    clock monotonic, includes prefill for decode): Gemma prefill 20.2 -> 16.3 tok/s,
+    decode ~8.3 -> 9.0; Qwen9b prefill 12.8 -> 15.0, decode 4.9 -> 5.1. The
+    Gemma prefill drop (-19%) is real in these runs and NOT explained; it needs a
+    repeat on an idle machine before the merge. An earlier A/B run used the wall clock
+    and was discarded (WSL clock steps produced negative durations).
+  - **Regression found and fixed by that A/B:** a final parse in lenient mode
+    returns NEED_MORE_INPUT for plain content, so Orbit's strict success check
+    rejected every non-tool Qwen answer (HTTP 500 "does not match the expected
+    peg-native format"). Final parses now use `COMPLETE` without `LENIENT`
+    (`common/chat.cpp`), as the original Orbit patch did.
+  - **Not verified:** Qwen 3.6/3.8 27B, LFM, Granite, MiniCPM, Ornith were not run
+    on the new backend; MTP on Gemma was not measured (it ran as configured by
+    default in the A/B but its acceptance rate was not compared); the
+    `analysis_*`/`workflow_mode`/`evidence_authority` failures (128 tests)
+    reproduce identically on unchanged `main` in this environment.
+
 - **QWEN38-ORBIT-PRODUCTION-ENABLEMENT-19 (2026-09-16, #355) — Qwen3.8 Flash
   Next UD-IQ1_M qualified for production on the Dell. MODEL ENABLEMENT ONLY: no
   llama.cpp change, MTP off, no ExpertStore/prefetch, existing model defaults

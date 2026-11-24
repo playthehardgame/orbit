@@ -28,6 +28,7 @@ set(LLAMA_CORE_SOURCES
     llama-kv-cache-msa.cpp
     llama-kv-cache-dsv4.cpp
     llama-memory.cpp
+    llama-moe-cache.cpp
     llama-memory-hybrid.cpp
     llama-memory-hybrid-iswa.cpp
     llama-memory-hybrid-idx.cpp
@@ -71,7 +72,8 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../tools/mtmd/models/models.h")
 endif()
 target_compile_features   (llama PRIVATE cxx_std_17) # don't bump
 
-target_link_libraries(llama PUBLIC ggml)
+find_package(Threads REQUIRED)
+target_link_libraries(llama PUBLIC ggml PRIVATE Threads::Threads)
 
 if (BUILD_SHARED_LIBS)
     set_target_properties(llama PROPERTIES POSITION_INDEPENDENT_CODE ON)

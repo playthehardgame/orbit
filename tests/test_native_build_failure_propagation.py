@@ -373,6 +373,10 @@ class StaleArtifactRegressionTests(unittest.TestCase):
             broken.write_bytes(
                 real_source.read_bytes() + b"\n#error deliberately broken for test\n"
             )
+            # the shim includes a sibling header; the broken COPY must still resolve it
+            (tmp_path / "orbit_batch_compat.h").write_bytes(
+                (real_source.parent / "orbit_batch_compat.h").read_bytes()
+            )
             output = tmp_path / "liborbit-persistent-mtp.so"
             with self.assertRaises(RuntimeError) as caught:
                 build_support.compile_cpp_helper(

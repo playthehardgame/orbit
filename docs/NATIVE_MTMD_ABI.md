@@ -15,7 +15,7 @@ the headers from the native revision being built and explicitly initializes
 every field used by Orbit. The bridge currently recognizes the reviewed mtmd
 context profiles `mtmd-context-v1` (b9551, 56 bytes), `mtmd-context-v2` (the
 earlier upstream candidate with batching/progress fields, 80 bytes) and
-`mtmd-context-v3` (the bundled 41abbfd vendor: an explicit `device` handle
+`mtmd-context-v3` (the bundled 46f4da2 vendor: an explicit `device` handle
 follows `use_gpu`, 96 bytes), the input-text profiles v1/v2 and both bitmap
 result shapes (`pointer-v1`, `wrapper-v1`). Unknown layouts fail before mmproj
 initialization.
@@ -44,20 +44,22 @@ manifest commit and build number explicitly; it must not derive
 
 ## Current Vendor
 
-- Upstream tag: none (`untagged`); upstream build number `10968` (the commit is
-  the parent of release `b10969`), recorded as `upstream_build_number`
-- Upstream commit: `41abbfd599fbdd3470fcae0a1fb6530ad8403cd7`
+- Upstream tag: none (`untagged`); upstream build number `12657` (the commit
+  count, the same rule that gave `10968` for `41abbfd`), recorded as
+  `upstream_build_number`
+- Upstream commit: `46f4da217419ecac95708600e0f6ebc4bdb91cfd`
 - Canonical source-tree SHA-256:
-  `166e8a8c933e0445de27af3c30347fe61d116bf0ee850d093a4749bcdf18da83`
+  `94c458f5074cee35bc65598942de3976621087b69b1f5021890f9b5a6fe32372`
 - Orbit patchset SHA-256 (`orbit-unified-diff-v1`: SHA-256 over the
   concatenated `diff -u --label a/<path> --label b/<path>` outputs of the
   declared patched paths in sorted order, upstream vs vendored):
-  `07b1a48d13610cc7fc51c63d6bbb0d6be8788f3faaf88a8d66770372ecfb5cb0`
+  `820edfd646d20bd5e879fb9598f95a8654861bae46711ecbaf798f3d34af5180` (this value is NOT reproducible against the
+  previous pin's recorded one; the algorithm above is what generated it)
 - Reproducible patchset attestation (`orbit-patchset-v2`, see
   `scripts/llama_provenance_v2.py`):
-  `f50b7229db767cbd5bc5ef1f69bb39156bbe4578ee7a143b3c5d3a3a1dda4e84`
+  `e184f211efe269df836300cf5390ad780802368e9cc6988c12f13cc5caf8441a`
 
-Previous vendor: `b9551` / `379ac6673b5cd75c7b4e07d1521c50f1e093878c`. A
+Previous vendor: `41abbfd599fbdd3470fcae0a1fb6530ad8403cd7` (build 10968); before that `b9551` / `379ac6673b5cd75c7b4e07d1521c50f1e093878c`. A
 vendor upgrade must rebuild the complete native runtime and bridge together,
 then repeat tokenizer, renderer, mmproj, MTP, lifecycle, final-prefix, and
 process-isolated conformance gates.

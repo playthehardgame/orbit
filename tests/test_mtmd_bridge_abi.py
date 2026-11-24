@@ -19,11 +19,11 @@ from orbit.native_llama.mtmd_bridge import _build_identity, validate_mtmd_bridge
 from orbit.native_llama.native_names import platform_runtime_libs, runtime_library_filename
 
 
-EXPECTED_COMMIT = "41abbfd599fbdd3470fcae0a1fb6530ad8403cd7"
-# 41abbfd carries no upstream release tag; its build number (10968, the parent of
-# b10969) is recorded explicitly in the manifest instead.
+EXPECTED_COMMIT = "46f4da217419ecac95708600e0f6ebc4bdb91cfd"
+# 46f4da2 carries no upstream release tag; its build number (12657 = commit count,
+# the same rule that gave 10968 for 41abbfd) is recorded explicitly in the manifest.
 EXPECTED_TAG = "untagged"
-EXPECTED_BUILD_NUMBER = 10968
+EXPECTED_BUILD_NUMBER = 12657
 
 
 class MtmdBridgeAbiTests(unittest.TestCase):
@@ -39,9 +39,10 @@ class MtmdBridgeAbiTests(unittest.TestCase):
         self.assertEqual(provenance.upstream_tag, EXPECTED_TAG)
         self.assertEqual(provenance.source_tree_sha256, source_tree_sha256(BUNDLED_SOURCE_ROOT))
         self.assertEqual(len(provenance.patchset_sha256), 64)
-        # 56 at the pin, plus chat.cpp/chat.h/qwen3-coder.cpp for strict final
-        # protocol validation. Independently derived by the provenance gate.
-        self.assertEqual(len(provenance.patched_paths), 59)
+        # 76 at 46f4da2: the Orbit patches carried over (profiling, strict final protocol
+        # validation in chat.cpp/chat.h/qwen3-coder.cpp) plus whitespace-only normalisation.
+        # Independently derived by the provenance gate.
+        self.assertEqual(len(provenance.patched_paths), 76)
         self.assertEqual(provenance.upstream_build_number, EXPECTED_BUILD_NUMBER)
 
     def test_untagged_pin_carries_an_explicit_build_number(self) -> None:
@@ -289,7 +290,7 @@ def _python_core_manifest() -> dict[str, dict[str, int]]:
                 "n_outputs_max",
                 "n_threads",
                 "flash_attn_type",
-                "defrag_thold",
+                "moe_cache_size",
                 "cb_eval",
                 "type_k",
                 "abort_callback",

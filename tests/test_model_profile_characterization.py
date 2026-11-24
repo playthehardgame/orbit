@@ -129,6 +129,12 @@ IDENTITIES = [
          _T + "bos_token_id": "124894", _T + "eos_token_id": "124900", _T + "padding_token_id": "124893",
          "lfm2moe.context_length": "128000", "lfm2moe.block_count": "24",
          "lfm2moe.expert_count": "32", "lfm2moe.expert_used_count": "4"})),
+    ("inkling2-mini", "INKLING2_MINI_OFFICIAL_TEMPLATE_SHA256",
+     _meta("inkling2_loop", mp.INKLING2_MINI_VERIFIED_MODEL_NAME, mp.INKLING2_MINI_VERIFIED_FILE_TYPE,
+           "inkling2", **{
+         _T + "eos_token_id": "200006", _T + "padding_token_id": "199999",
+         "inkling2_loop.block_count": "24", "inkling2_loop.expert_count": "128",
+         "inkling2_loop.expert_used_count": "8", "inkling2_loop.loop.count": "3"})),
     ("qwen3-coder", "QWEN3_CODER_OFFICIAL_TEMPLATE_SHA256",
      _meta("qwen3moe", mp.QWEN3_CODER_VERIFIED_MODEL_NAME, mp.QWEN3_CODER_VERIFIED_FILE_TYPE, "qwen2", **{
          "general.quantization_version": "2", _T + "add_bos_token": "false",
@@ -278,6 +284,7 @@ class ModelProfileCharacterizationTests(unittest.TestCase):
             mp.QWEN38_FLASH_NEXT_PROFILE_ID, mp.LFM25_PROFILE_ID, mp.LFM25_Q8_PROFILE_ID,
             mp.LFM25_Q6_PROFILE_ID, mp.QWEN3_CODER_PROFILE_ID, mp.MINICPM5_PROFILE_ID,
             mp.GRANITE42_PROFILE_ID, mp.GRANITE42_8B_PROFILE_ID,
+            mp.INKLING2_MINI_PROFILE_ID,
         ):
             self.assertIn(pid, reached)
 

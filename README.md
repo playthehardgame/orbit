@@ -128,6 +128,7 @@ This list is not a performance ranking.
 | Gemma 4 E4B Heretic | Q4_K_M (BF16 mmproj; image/audio smoke-tested) |
 | Granite 4.2 3B | Q4_K_M, Q8_0 |
 | Granite 4.2 8B | Q4_K_M, Q6_K |
+| Inkling 2 Mini | IQ4_NL (ggml-org GGUF; identity and smoke-tested only, not qualified; needs ~17 GiB RAM, no image input) |
 
 **Qualification report diagnostics.** A fixture stopped by an exception carries
 `error_detail` (bounded message and traceback tail) in the report JSON. The `route` call

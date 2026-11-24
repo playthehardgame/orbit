@@ -1866,10 +1866,9 @@ common_chat_msg common_chat_peg_parse(const common_peg_arena &          src_pars
 
     // Orbit: partial ASTs serve streaming only; a final tool envelope must be
     // closed and consume the entire response (see the end-of-input check below).
-    common_peg_parse_flags flags = COMMON_PEG_PARSE_FLAG_LENIENT;
-    if (!is_partial) {
-        flags |= COMMON_PEG_PARSE_FLAG_COMPLETE;
-    }
+    // Final (non-partial) parses stay strict: no lenient end-of-input, so a response that
+    // is not fully and validly consumed fails instead of reporting NEED_MORE_INPUT.
+    common_peg_parse_flags flags = is_partial ? COMMON_PEG_PARSE_FLAG_LENIENT : COMMON_PEG_PARSE_FLAG_COMPLETE;
     if (params.debug) {
         flags |= COMMON_PEG_PARSE_FLAG_DEBUG;
     }

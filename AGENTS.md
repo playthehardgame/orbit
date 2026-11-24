@@ -1505,10 +1505,29 @@ active roadmap and qualification limits.
     coherent with separated reasoning (129 tokens in ~28 s, includes prefill); one
     tool call (`get_time {"city":"Roma"}`) parsed correctly. No throughput
     benchmark, no qualification fixtures, no long-context or ANALYSIS run.
-  - **Not verified:** the previously qualified models (Gemma/Qwen/LFM/Granite/...)
-    were NOT re-qualified on the new backend; MTP on Gemma was not exercised; the
-    `analysis_*`/`workflow_mode`/`evidence_authority` test failures reproduce on
-    unchanged `main` in this environment and are unrelated.
+  - **A/B against the old backend (same machine, same flags: ctx 8192, 5/5
+    threads, batch 256/128; old = `main` worktree built at 41abbfd):**
+    core-v1 on Gemma 4 26B-A4B: simple_chat/pwd_route/pwd_final PASS and
+    json_artifact FAIL (`artifact_json_mismatch`) on BOTH backends. Qwen3.8 9B
+    Distill: core-v1 fixtures are `NOT_APPLICABLE` for that profile (identity,
+    lifecycle, protocol PASS on both). Greedy equivalence (4 cases: plain chat, two
+    tool calls, answer after a tool result) on Gemma and Qwen9b: generated text, tool
+    calls and finish reasons byte-identical old vs new. Throughput (n=2-3, wall
+    clock monotonic, includes prefill for decode): Gemma prefill 20.2 -> 16.3 tok/s,
+    decode ~8.3 -> 9.0; Qwen9b prefill 12.8 -> 15.0, decode 4.9 -> 5.1. The
+    Gemma prefill drop (-19%) is real in these runs and NOT explained; it needs a
+    repeat on an idle machine before the merge. An earlier A/B run used the wall clock
+    and was discarded (WSL clock steps produced negative durations).
+  - **Regression found and fixed by that A/B:** a final parse in lenient mode
+    returns NEED_MORE_INPUT for plain content, so Orbit's strict success check
+    rejected every non-tool Qwen answer (HTTP 500 "does not match the expected
+    peg-native format"). Final parses now use `COMPLETE` without `LENIENT`
+    (`common/chat.cpp`), as the original Orbit patch did.
+  - **Not verified:** Qwen 3.6/3.8 27B, LFM, Granite, MiniCPM, Ornith were not run
+    on the new backend; MTP on Gemma was not measured (it ran as configured by
+    default in the A/B but its acceptance rate was not compared); the
+    `analysis_*`/`workflow_mode`/`evidence_authority` failures (128 tests)
+    reproduce identically on unchanged `main` in this environment.
 
 - **QWEN38-ORBIT-PRODUCTION-ENABLEMENT-19 (2026-09-16, #355) — Qwen3.8 Flash
   Next UD-IQ1_M qualified for production on the Dell. MODEL ENABLEMENT ONLY: no

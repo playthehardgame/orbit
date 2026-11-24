@@ -49,15 +49,15 @@ manifest commit and build number explicitly; it must not derive
   `upstream_build_number`
 - Upstream commit: `46f4da217419ecac95708600e0f6ebc4bdb91cfd`
 - Canonical source-tree SHA-256:
-  `73cfdc82c1616470510c6cdc3c19efe3c72a646d401b79851546baa0429c4917`
+  `94c458f5074cee35bc65598942de3976621087b69b1f5021890f9b5a6fe32372`
 - Orbit patchset SHA-256 (`orbit-unified-diff-v1`: SHA-256 over the
   concatenated `diff -u --label a/<path> --label b/<path>` outputs of the
   declared patched paths in sorted order, upstream vs vendored):
-  `0b04f39c0dc57b1685822f62b322213d7c4a565da349f1040032813481a93f81` (this value is NOT reproducible against the
+  `820edfd646d20bd5e879fb9598f95a8654861bae46711ecbaf798f3d34af5180` (this value is NOT reproducible against the
   previous pin's recorded one; the algorithm above is what generated it)
 - Reproducible patchset attestation (`orbit-patchset-v2`, see
   `scripts/llama_provenance_v2.py`):
-  `d2464f8a71b8416207663d4804fceb8f74ab21a35e0da174309b016a5d1a91a6`
+  `e184f211efe269df836300cf5390ad780802368e9cc6988c12f13cc5caf8441a`
 
 Previous vendor: `41abbfd599fbdd3470fcae0a1fb6530ad8403cd7` (build 10968); before that `b9551` / `379ac6673b5cd75c7b4e07d1521c50f1e093878c`. A
 vendor upgrade must rebuild the complete native runtime and bridge together,

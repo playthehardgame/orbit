@@ -145,6 +145,7 @@ class ModelMatrixTests(unittest.TestCase):
             "18": "Q6_K",
             "20": "IQ2_XS",
             "31": "UD-IQ1_M",
+            "25": "IQ4_NL",
         }
         for name, value in vars(model_profiles).items():
             if not (name.endswith("_VERIFIED_FILE_TYPE") and isinstance(value, str)):

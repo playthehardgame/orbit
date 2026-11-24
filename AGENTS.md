@@ -1526,14 +1526,17 @@ active roadmap and qualification limits.
     peg-native format"). Final parses now use `COMPLETE` without `LENIENT`
     (`common/chat.cpp`), as the original Orbit patch did.
   - **Equivalence on more models (same 4 greedy cases, old vs new):** MiniCPM5 2B,
-    Granite 4.2 3B, Granite 4.2 8B and Underdog Saluki 27B (IQ2) are byte-identical.
+    Granite 4.2 3B, Granite 4.2 8B, Underdog Saluki 27B (IQ2), Nous Arete 27B Q4_K_M and
+    Gemma 4 E4B Heretic are byte-identical (on E4B both backends return the tool call
+    as raw `<|tool_call>` text in `content`, unparsed: pre-existing, identical).
     LFM2.5 8B-A1B: finish reasons and tool calls are identical but the greedy
     *reasoning* text diverges after ~100 chars in 3 of 4 cases (probably numeric
     differences from upstream changes to the LFM2 graph; not proven), and the
     `tool_result` case returns HTTP 500 ("unparsed peg-native output:", empty model
-    output) on BOTH backends, i.e. pre-existing, not caused by the re-pin.
-  - **Not verified:** `qwen38-27b-q4-k-m` is not downloaded on the Dell (no run);
-    Nous Arete 27B (17 GB), Qwen 3.6 35B, Ornith and Qwen3-Coder were not run on the
+    output) on BOTH backends, i.e. pre-existing, not caused by the re-pin. LFM2.5 Q8_0 behaves the
+    same (500 on both; reasoning text differs in 1 of 4 cases).
+  - **Not verified:** `qwen38-27b-q4-k-m`, Qwen 3.6 35B and Ornith 35B are not downloaded on the Dell
+    (no run); Qwen3-Coder is present only as Q4_1 (not the registry quant) and was not run on the
     new backend; MTP on Gemma was not measured (it ran as configured by
     default in the A/B but its acceptance rate was not compared); the
     `analysis_*`/`workflow_mode`/`evidence_authority` failures (128 tests)

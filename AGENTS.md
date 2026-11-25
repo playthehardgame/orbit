@@ -1535,8 +1535,27 @@ active roadmap and qualification limits.
     `tool_result` case returns HTTP 500 ("unparsed peg-native output:", empty model
     output) on BOTH backends, i.e. pre-existing, not caused by the re-pin. LFM2.5 Q8_0 behaves the
     same (500 on both; reasoning text differs in 1 of 4 cases).
-  - **Not verified:** `qwen38-27b-q4-k-m`, Qwen 3.6 35B and Ornith 35B are not downloaded on the Dell
-    (no run); Qwen3-Coder is present only as Q4_1 (not the registry quant) and was not run on the
+  - **More models, same 4 cases:** Ornith 1.5 35B-A3B and Qwen3.8 27B (unsloth
+    `UD-Q4_K_M`, run via `--model <path>`; accepted by the `orbit-qwen38-native-v1`
+    profile) are byte-identical old vs new. Qwen 3.6 35B-A3B (`ggml-org`) is refused on BOTH
+    backends with `qwen36_template_identity_mismatch` (file size matches the registry; the
+    template differs from the verified one), so it was not run: pre-existing.
+    `qwen38-27b-q4-k-m` in `model_registry.json` names `Qwen3.8-27B-Q4_K_M.gguf`, which does not
+    exist in `unsloth/Qwen3.8-27B-GGUF` (only `UD-*` files), and has no size/sha256 pinned:
+    it is not downloadable as written (NOT fixed here).
+  - **MTP on Gemma (`--mtp`), found by running it, not by the suite:** the first re-pinned
+    build segfaulted on the first request (`common_batch(nullptr)`: `ctx_tgt_borrowed` is unset
+    on most session creation paths). Fixed in `44f4a00` (use the live `ctx_tgt`; flag only the
+    last row of the draft prefill batch as output so it matches the target's own prefill).
+    After the fix MTP runs (8 requests, same prompts, greedy, 160 tokens): last-request
+    acceptance 0.706 old vs 0.677 new, last-request tok/s 13.1 vs 11.4 (noisy host). OPEN:
+    on the new backend the Python-function prompt starts with `thought-thought` in 2 of 8 MTP
+    requests (never on old, never without MTP). Cause established: the think-off Gemma prompt
+    is stripped to end at `<turn|>\n` (no `<|turn>model` opening, `_strip_thinking_prompt`) on
+    both backends; the first-token logits are a near tie (`thought` vs `<channel|>`), the new
+    backend shifts them by ~0.4, and `_LeadingThoughtLabelFilter` only removes a first line that
+    is exactly `thought`. No crash, no corruption; not fixed. MTP is opt-in (`--mtp`).
+  - **Not verified:** Qwen3-Coder is present only as Q4_1 (not the registry quant) and was not run on the
     new backend; MTP on Gemma was not measured (it ran as configured by
     default in the A/B but its acceptance rate was not compared); the
     `analysis_*`/`workflow_mode`/`evidence_authority` failures (128 tests)

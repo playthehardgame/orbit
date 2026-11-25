@@ -9,10 +9,17 @@
 #include "common.h"
 #include "llama.h"
 
-static inline common_batch orbit_common_batch(llama_context * ctx, const llama_batch & src) {
+// `last_output_only` mirrors the target decode when the target flagged only the last
+// row as an output (fill_target_prefill_batch). Upstream's masked nextn rows (gemma4,
+// shared memory) are indexed through the target's own output map, so the batch handed
+// to common_speculative_process() must carry the same output flags the target decode
+// had; otherwise the lookup misses (nullptr) or reads the wrong row.
+static inline common_batch orbit_common_batch(llama_context * ctx, const llama_batch & src,
+                                              bool last_output_only = false) {
     common_batch out(ctx);
     for (int32_t i = 0; i < src.n_tokens; ++i) {
-        const bool output = src.logits ? src.logits[i] != 0 : false;
+        const bool output = last_output_only ? (i == src.n_tokens - 1)
+                                             : (src.logits ? src.logits[i] != 0 : false);
         const int32_t n_seq = src.n_seq_id ? src.n_seq_id[i] : 1;
         if (n_seq > 1) {
             out.add(src.token[i], src.pos[i],
@@ -23,3 +30,4 @@ static inline common_batch orbit_common_batch(llama_context * ctx, const llama_b
     }
     return out;
 }
+

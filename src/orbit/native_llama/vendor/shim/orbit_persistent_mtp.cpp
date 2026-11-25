@@ -2882,7 +2882,7 @@ extern "C" bool orbit_mtp_session_complete(
                             "prefill", draft_pos0 + (int32_t) offset, chunk.size());
                         {
                             const auto phase_start = std::chrono::steady_clock::now();
-                            const bool ok = common_speculative_process(session->spec, orbit_common_batch(session->ctx_tgt_borrowed, prefill));
+                            const bool ok = common_speculative_process(session->spec, orbit_common_batch(ctx_tgt, prefill, true));
                             phase_add(session->phase_speculative_process, phase_start);
                             if (!ok) {
                                 llama_batch_free(prefill);

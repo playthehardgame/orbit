@@ -1559,8 +1559,13 @@ active roadmap and qualification limits.
     20 requests (8 'prime function' variants, 12 short Python-function prompts, 40-60 tokens) showed NO
     `thought` prefix. NOT reproduced; the original 8-request prompt set was not recorded, so the 2/8 rate
     is neither confirmed nor refuted. No code change; the filter is deliberately not widened blind.
-  - **Not verified:** Qwen3-Coder is present only as Q4_1 (not the registry quant) and was not run on the
-    new backend; MTP on Gemma was not measured (it ran as configured by
+  - **Qwen3-Coder (verified 2026-11-26):** the registry quant `Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf`
+    was downloaded (`orbit download`, 18,556,689,568 B = registry size) and run on the new backend
+    (profile `orbit-qwen3-coder-native-v1`, ctx 8192, 5/5 threads, greedy, same 4 cases): plain chat,
+    two tool calls (`get_time {"city":"Roma"}`, `run_shell {"command":"pwd"}`) and the answer after a
+    tool result are all correct. NOT an old-vs-new byte comparison (the old backend was not rebuilt
+    for it), and sha256 was not re-checked after download.
+  - **Not verified:** MTP on Gemma was not measured (it ran as configured by
     default in the A/B but its acceptance rate was not compared); the
     `analysis_*`/`workflow_mode`/`evidence_authority` failures (128 tests)
     reproduce identically on unchanged `main` in this environment.

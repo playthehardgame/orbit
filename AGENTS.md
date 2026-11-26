@@ -1555,6 +1555,10 @@ active roadmap and qualification limits.
     both backends; the first-token logits are a near tie (`thought` vs `<channel|>`), the new
     backend shifts them by ~0.4, and `_LeadingThoughtLabelFilter` only removes a first line that
     is exactly `thought`. No crash, no corruption; not fixed. MTP is opt-in (`--mtp`).
+    Re-run on 2026-11-26 (Dell, `ggml-org` gemma-4-26B-A4B Q4_0 + MTP, ctx 8192, think off, greedy):
+    20 requests (8 'prime function' variants, 12 short Python-function prompts, 40-60 tokens) showed NO
+    `thought` prefix. NOT reproduced; the original 8-request prompt set was not recorded, so the 2/8 rate
+    is neither confirmed nor refuted. No code change; the filter is deliberately not widened blind.
   - **Not verified:** Qwen3-Coder is present only as Q4_1 (not the registry quant) and was not run on the
     new backend; MTP on Gemma was not measured (it ran as configured by
     default in the A/B but its acceptance rate was not compared); the
